@@ -1,0 +1,28 @@
+@import 'bootstrap/dist/css/bootstrap.min.css';
+
+/* Pantallas táctiles (tablet de la bodega): objetivos de al menos 44 px. */
+@media (pointer: coarse) {
+    .btn,
+    .form-control,
+    .form-select,
+    .list-group-item-action,
+    .nav-link {
+        min-height: 44px;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .form-check-input {
+        width: 1.5em;
+        height: 1.5em;
+    }
+
+    .form-check-label {
+        padding-left: 0.25rem;
+        padding-top: 0.15rem;
+    }
+}

@@ -1,0 +1,1489 @@
+# Documento de diseño y especificación
+## Sistema de inventario para una bodega
+
+**Versión:** 1.1  
+**Estado:** Diseño revisado  
+**Tipo de aplicación:** Aplicación web privada para un único negocio  
+**Ubicación:** Ecuador
+
+---
+
+## Historial de cambios
+
+| Versión | Cambios |
+|---|---|
+| 1.0 | Diseño preliminar consolidado. Se conserva sin cambios en `Requerimientos_v1.0.txt`. |
+| 1.1 | Incorpora la revisión crítica de arquitectura: permisos especiales; presentación base única; factor y control de caducidad no modificables una vez usados; identidad del lote; motivos cerrados; reglas de vencimiento, FEFO, ajustes y reversiones; tipos de datos con signo y claves foráneas compuestas; concurrencia con bloqueo de lotes y `READ COMMITTED`; protección contra envíos duplicados; cuentas de MySQL con historial de solo inserción; infraestructura en Windows 10 Enterprise LTSC 2021 con Apache, PHP, MySQL y Tailscale; pruebas sobre una base MySQL independiente y nuevos casos de aceptación. |
+
+---
+
+# 1. Descripción del proyecto
+
+## 1.1. Contexto
+
+El cliente administra una bodega donde recibe y almacena diferentes productos de consumo, como aceite, mantequilla, fideos y otros artículos.
+
+Actualmente no existe un sistema de control de inventario. Esto ocasiona que el encargado no conozca con precisión qué productos hay disponibles, en qué cantidades se encuentran ni cuáles están próximos a caducar.
+
+El problema principal es la falta de visibilidad y trazabilidad del inventario, que puede ocasionar pérdidas económicas por productos vencidos o mercancía cuya existencia se desconoce.
+
+Se necesita desarrollar una aplicación que permita administrar los productos, registrar las entradas y salidas, controlar las cantidades por lote y mostrar alertas de caducidad.
+
+## 1.2. Objetivo general
+
+Desarrollar un sistema de inventario sencillo que permita conocer las existencias reales de la bodega, controlar los productos por lotes y fechas de caducidad, registrar sus movimientos y reducir las pérdidas por vencimiento.
+
+## 1.3. Alcance
+
+El sistema estará destinado inicialmente a:
+
+- Un solo negocio.
+- Una sola bodega.
+- Una computadora personal ubicada en la casa del administrador, con Windows 10 Enterprise LTSC 2021, que actuará como servidor.
+- Una tablet utilizada desde la bodega.
+
+La computadora de casa alojará la aplicación y la base de datos. La tablet accederá al sistema mediante Internet y una red privada Tailscale.
+
+Se asume que el entorno funcionará sin interrupciones el 99 % del tiempo.
+
+No se desarrollará inicialmente un sistema multiempresa ni se contemplará la administración de múltiples sucursales. Tampoco se contemplan en la primera versión el trabajo offline, las ventas ni la facturación.
+
+---
+
+# 2. Usuarios y funcionamiento
+
+## 2.1. Administrador
+
+Utiliza principalmente la computadora de casa.
+
+Necesita:
+- Consultar el inventario completo.
+- Revisar las entradas y salidas.
+- Consultar el historial de movimientos.
+- Revisar productos próximos a caducar.
+- Administrar productos y presentaciones.
+- Consultar cantidades por lote.
+- Administrar los usuarios, sus permisos especiales y la configuración básica.
+
+## 2.2. Encargado de bodega
+
+Utiliza principalmente una tablet.
+
+Necesita:
+- Consultar los productos disponibles.
+- Registrar recepciones de mercancía.
+- Registrar las cantidades recibidas.
+- Registrar lotes y fechas de caducidad.
+- Registrar salidas.
+- Consultar las existencias.
+- Registrar la apertura de cajas.
+- Consultar alertas de caducidad.
+
+## 2.3. Permisos
+
+El sistema tiene dos roles base: administrador y encargado de bodega.
+
+El administrador puede conceder a un encargado tres permisos especiales, almacenados como atributos booleanos del usuario:
+
+- `puede_gestionar_catalogo`: gestionar categorías, productos, presentaciones y códigos de barras.
+- `puede_ajustar_inventario`: registrar ajustes de inventario y corregir el código o la fecha de caducidad de un lote.
+- `puede_revertir`: registrar reversiones de movimientos.
+
+El administrador tiene implícitamente los tres permisos.
+
+| Operación | Encargado | Encargado con permiso especial | Administrador |
+|---|---|---|---|
+| Consultar productos, existencias, lotes, alertas e historial | Sí | Sí | Sí |
+| Registrar entradas, salidas (con cualquier motivo) y conversiones | Sí | Sí | Sí |
+| Gestionar categorías, productos, presentaciones y códigos de barras | No | Con `puede_gestionar_catalogo` | Sí |
+| Registrar ajustes y corregir datos de un lote | No | Con `puede_ajustar_inventario` | Sí |
+| Registrar reversiones | No | Con `puede_revertir` | Sí |
+| Gestionar usuarios, permisos y configuración | No | No | Sí |
+
+Reglas:
+- Los permisos se validan en el servidor en cada operación. Ocultar botones en la interfaz no es suficiente.
+- El rol y los permisos especiales solo pueden modificarse desde la gestión de usuarios, por el administrador. Ningún otro formulario puede asignarlos.
+- Un usuario inactivo no puede iniciar sesión, y sus sesiones abiertas dejan de ser válidas en la siguiente petición.
+- El sistema identifica qué usuario realizó cada movimiento.
+- No se implementa un sistema genérico de roles y autorizaciones.
+
+---
+
+# 3. Requerimientos funcionales
+
+## RF-01. Gestión de productos
+
+El sistema debe permitir registrar, consultar y editar productos.
+
+Información prevista:
+
+- Nombre descriptivo.
+- Marca, opcionalmente.
+- Categoría.
+- Indicador de control de caducidad.
+- Existencias mínimas, opcionalmente.
+- Estado activo o inactivo.
+- Observaciones, opcionalmente.
+
+Un producto representa un artículo concreto. Por ejemplo, el aceite de 1 litro y el aceite de 500 ml son productos distintos, no presentaciones del mismo producto.
+
+El nombre descriptivo debe incluir la variante y el contenido. Ejemplo: "Aceite de girasol 1 L".
+
+Los productos no deben identificarse exclusivamente por su nombre. Cada uno tendrá un identificador único. Cuando exista, el código de barras de una presentación es el identificador más fiable del producto.
+
+No se impone una restricción única sobre nombre y marca, para no impedir variantes legítimas. En su lugar, si se intenta registrar un producto con el mismo nombre y la misma marca que otro existente (comparados sin distinguir mayúsculas ni espacios repetidos), el sistema no lo crea directamente: muestra el producto existente y solicita una confirmación explícita. Así se evitan los duplicados por doble envío o por descuido.
+
+### Unidad base
+
+Cada producto representa sus existencias en una unidad base. La unidad base no es un campo del producto: es su presentación base (RF-02).
+
+Ejemplos:
+- Aceite de 1 litro: botella.
+- Mantequilla de 250 gramos: unidad.
+- Fideos de 500 gramos: paquete.
+
+### Control de caducidad
+
+- Cada producto indica si controla fecha de caducidad. El valor inicial es "sí".
+- Si el producto controla caducidad, la fecha de caducidad es obligatoria en cada recepción.
+- El indicador no puede modificarse cuando el producto ya tiene lotes o movimientos asociados.
+
+### Existencias mínimas
+
+Se expresan en unidades base y se comparan con la existencia disponible del producto, sin contar los lotes vencidos.
+
+## RF-02. Gestión de presentaciones
+
+Un producto puede comercializarse en diferentes presentaciones.
+
+Ejemplo:
+
+Producto: aceite de 1 litro.
+
+| Presentación | Equivalencia |
+|---|---:|
+| Botella | 1 botella |
+| Caja | 12 botellas |
+
+El sistema debe permitir definir:
+- Nombre de la presentación, único dentro del producto.
+- Factor de conversión: cantidad entera de unidades base que contiene la presentación, como mínimo 1.
+- Códigos de barras, cuando existan.
+- Estado activo o inactivo.
+
+### Presentación base
+
+- Cada producto tiene exactamente una presentación base, con factor 1.
+- La presentación base se crea en la misma operación (transacción) que el producto.
+- Una presentación no puede dejar de ser base ni otra pasar a serlo.
+- La presentación base no puede desactivarse.
+
+### Reglas
+
+- La equivalencia es configurable por producto.
+- El factor no puede modificarse después de que la presentación tenga movimientos. Si el proveedor cambia el contenido de una caja, se crea una presentación nueva y la anterior se desactiva cuando se agote.
+- No se puede desactivar una presentación que tenga existencias.
+- En la primera versión todas las cantidades son enteras.
+- No todos los productos tienen que comercializarse en cajas.
+- Una presentación puede tener un código de barras diferente de las demás presentaciones del mismo producto.
+
+## RF-03. Registro de entradas
+
+El sistema debe permitir registrar la recepción de mercancía.
+
+Información necesaria:
+
+- Fecha y hora de recepción.
+- Producto.
+- Una o varias líneas. Cada línea indica:
+  - Presentación recibida.
+  - Cantidad recibida.
+  - Código de lote, si existe.
+  - Fecha de caducidad, obligatoria si el producto controla caducidad.
+  - Costo de compra unitario, cuando se conozca.
+- Observaciones.
+- Usuario responsable, registrado automáticamente.
+
+Una misma recepción puede incluir, por ejemplo, cajas completas y unidades sueltas del mismo lote, o mercancía de varios lotes.
+
+### Lotes
+
+- Un lote se identifica por producto, código de lote y fecha de caducidad. Si la mercancía no tiene código de lote, se registra sin código.
+- Si llega mercancía con la misma combinación que un lote existente, se suma a ese lote.
+- Si la combinación no existe, el lote se crea dentro de la misma operación de entrada. No se crean lotes fuera de una entrada.
+- Si el mismo producto llega con diferentes fechas de caducidad, se registran lotes diferentes.
+- No se debe asumir que todas las unidades de un producto tienen la misma fecha de caducidad.
+
+### Costo de compra
+
+- El costo se registra por unidad de la presentación recibida. Por ejemplo, si se reciben cajas, se registra el costo de una caja.
+- El costo por unidad base se obtiene dividiendo ese costo entre el factor de la presentación.
+- El costo de compra es independiente del precio de venta futuro.
+
+### Fecha
+
+La fecha de recepción puede ser anterior al momento del registro, por ejemplo, al registrar después una recepción anotada en papel. Nunca puede ser futura. El sistema conserva además la fecha y hora en que se registró la operación.
+
+### Envíos duplicados
+
+Un mismo formulario enviado dos veces (doble toque, reintento por una conexión inestable) no debe registrar dos entradas (RNF-02).
+
+## RF-04. Control de lotes
+
+Cada lote pertenece a un producto.
+
+Debe permitir consultar:
+
+- Producto.
+- Código de lote, si existe.
+- Fechas de la primera y de la última recepción, obtenidas del historial de entradas.
+- Fecha de caducidad.
+- Existencias por presentación.
+- Existencia del lote en unidades base.
+
+La fecha de recepción no se almacena en el lote: se obtiene de los movimientos de entrada.
+
+Un producto puede tener varios lotes simultáneamente.
+
+Las existencias deben poder consultarse por producto y por lote.
+
+La fecha de caducidad debe poder registrarse manualmente. No se debe asumir que un código de barras comercial contiene esa información.
+
+### Corrección de datos de un lote
+
+Un usuario con `puede_ajustar_inventario` puede corregir el código o la fecha de caducidad de un lote. La corrección se rechaza si el lote resultante coincide con otro lote existente del mismo producto.
+
+## RF-05. Control de cajas y unidades
+
+El sistema debe distinguir la mercancía según su presentación, por ejemplo, cajas completas y unidades individuales. Las unidades sueltas son la existencia en la presentación base.
+
+Ejemplo:
+
+- Producto: aceite de 1 litro.
+- Una caja contiene 12 botellas.
+- Se reciben 10 cajas.
+- Se abre una caja para retirar 7 botellas.
+
+Resultado:
+
+- Cajas cerradas: 9.
+- Unidades sueltas: 5.
+- Existencia del lote: 113 botellas.
+
+Las existencias de cada presentación se controlan por separado. No se calculan dividiendo el total entre el factor, porque que una caja esté cerrada o abierta es un estado físico.
+
+El sistema debe permitir registrar una conversión entre presentaciones.
+
+La apertura de una caja debe:
+1. Descontar una caja completa.
+2. Añadir las unidades equivalentes a la presentación individual.
+3. Mantener el mismo lote.
+4. Conservar el historial de la operación.
+
+La conversión no debe modificar la cantidad total de mercancía.
+
+La misma lógica debe permitir conversiones inversas cuando corresponda, por ejemplo, volver a empaquetar unidades en una caja completa.
+
+Una conversión solo es válida si:
+- Afecta a un único lote.
+- Todas sus presentaciones pertenecen al mismo producto.
+- La suma de sus cantidades en unidades base es cero.
+- Tiene al menos una línea que disminuye y una línea que aumenta.
+- Ninguna combinación de lote y presentación queda con existencia negativa.
+
+Las conversiones también se permiten en lotes vencidos, porque no modifican el total y facilitan su descarte.
+
+La operación "abrir una caja y retirar unidades" se compone de una conversión y una salida. La interfaz podrá combinarlas en un solo paso, registrándolas en la misma transacción. Esta decisión de interfaz se tomará en la Etapa 4.
+
+**Importante:** las cajas y unidades sueltas deben controlarse por lote. No se debe convertir una caja de un lote en unidades pertenecientes a otro lote.
+
+## RF-06. Registro de salidas
+
+El sistema debe permitir registrar salidas de mercancía.
+
+Motivos:
+- Venta o entrega.
+- Producto dañado.
+- Producto vencido.
+- Devolución al proveedor.
+- Otro motivo, que requiere observación.
+
+Los motivos forman una lista cerrada. Las devoluciones de clientes quedan fuera del alcance de la primera versión.
+
+Información:
+- Fecha y hora.
+- Producto.
+- Lote.
+- Presentación.
+- Cantidad.
+- Motivo.
+- Observaciones.
+- Usuario responsable.
+
+El sistema debe impedir retirar una cantidad superior a la disponible en la combinación de lote y presentación seleccionada.
+
+Las salidas deben reducir las existencias correspondientes al lote y presentación seleccionados.
+
+Cuando se seleccione un producto, se deben mostrar sus lotes disponibles, sus fechas de caducidad y sus existencias por presentación, en orden FEFO.
+
+## RF-07. Prioridad de salida FEFO
+
+Se utilizará FEFO (*First Expired, First Out*).
+
+El sistema debe recomendar primero los lotes cuya fecha de caducidad esté más próxima. Los lotes sin fecha de caducidad se muestran al final. Entre lotes con la misma fecha, se muestra primero el más antiguo.
+
+No se debe seleccionar automáticamente un lote sin que el usuario pueda verificarlo.
+
+### Lotes vencidos
+
+Un lote está vencido cuando su fecha de caducidad es anterior a la fecha actual. El día de su caducidad, el lote todavía es válido.
+
+La fecha actual la calcula la aplicación en la zona horaria `America/Guayaquil`, no el reloj de la base de datos.
+
+Los lotes vencidos no deben aparecer como mercancía disponible para salidas normales.
+
+El servidor rechaza cualquier salida de un lote vencido, salvo con motivo "Producto vencido" o "Producto dañado", o mediante un ajuste realizado por un usuario con `puede_ajustar_inventario`.
+
+## RF-08. Alertas de caducidad
+
+El sistema debe mostrar alertas cuando existan lotes próximos a caducar.
+
+La alerta debe incluir:
+
+- Nombre del producto.
+- Lote.
+- Fecha de caducidad.
+- Existencias del lote por presentación y en unidades base.
+- Días restantes.
+
+Configuración inicial:
+- Periodo de alerta: 30 días antes de la caducidad.
+- El administrador puede modificar el periodo. El valor se guarda en la configuración del sistema.
+
+Estados, siendo N el periodo de alerta:
+- Vencido: la fecha de caducidad es anterior a la fecha actual.
+- Próximo a caducar: faltan entre 0 y N días para la fecha de caducidad.
+- Vigente: faltan más de N días.
+
+Los lotes sin fecha de caducidad no tienen estado de caducidad.
+
+Las alertas deben calcularse a partir de la fecha actual y de la fecha de caducidad de cada lote.
+
+No se deben utilizar fechas fijas ni valores predefinidos para determinar los estados.
+
+Las alertas y los listados de lotes vencidos solo incluyen lotes con existencias mayores que cero. Las cantidades mostradas deben corresponder a las existencias reales del lote.
+
+En la primera versión, las alertas aparecerán en el panel principal cuando el usuario abra el sistema.
+
+Las notificaciones externas, como correo electrónico o notificaciones push, quedan fuera del alcance inicial.
+
+## RF-09. Historial de movimientos
+
+El sistema debe conservar un historial de las operaciones realizadas.
+
+Debe permitir consultar:
+- Fecha y hora en que ocurrió el movimiento.
+- Fecha y hora en que se registró.
+- Tipo de movimiento.
+- Producto.
+- Lote.
+- Cantidad.
+- Presentación.
+- Usuario responsable.
+- Motivo u observación.
+
+Los movimientos confirmados no se modifican ni se eliminan. Lo garantizan la aplicación y los permisos de la cuenta de base de datos (§6.5).
+
+Si se comete un error, se registra una reversión o un ajuste como movimiento nuevo, de modo que se conserve la trazabilidad.
+
+### Reversiones
+
+- Requieren el permiso `puede_revertir` y una observación.
+- Un movimiento solo puede revertirse una vez.
+- Una reversión no puede revertirse. Para rehacer una operación, se registra un movimiento nuevo.
+- La reversión es la negación exacta de cada línea del movimiento original, con el mismo lote, la misma presentación y el mismo factor.
+- Se rechaza si deja alguna existencia negativa, por ejemplo, al revertir una entrada cuya mercancía ya salió.
+
+### Ajustes
+
+- Requieren el permiso `puede_ajustar_inventario`, un motivo (conteo físico, producto dañado u otro) y una observación.
+- Pueden aumentar o disminuir existencias, sin dejar ninguna existencia negativa.
+
+## RF-10. Panel principal
+
+El panel debe mostrar información útil para la administración de la bodega.
+
+Indicadores previstos:
+- Productos registrados.
+- Productos con existencia.
+- Lotes activos, es decir, con existencia mayor que cero.
+- Lotes próximos a caducar.
+- Lotes vencidos con existencia.
+- Productos con existencias bajas.
+
+Secciones:
+- Productos próximos a caducar.
+- Lotes vencidos.
+- Movimientos recientes.
+- Productos con pocas existencias.
+
+Todos los indicadores deben calcularse a partir de los datos almacenados.
+
+No se suman cantidades de productos distintos, porque sus unidades no son comparables.
+
+Se distingue entre existencia física (todos los lotes) y existencia disponible (sin lotes vencidos).
+
+## RF-11. Acceso desde computadora y tablet
+
+El sistema debe funcionar mediante navegador web.
+
+La interfaz debe adaptarse a:
+- Computadoras de escritorio.
+- Tablets.
+
+La tablet debe poder consultar y modificar los mismos datos que la computadora de casa.
+
+No deben existir inventarios independientes por dispositivo.
+
+---
+
+# 4. Requerimientos no funcionales
+
+## RNF-01. Facilidad de uso
+
+La interfaz debe ser sencilla y comprensible para personas que no necesariamente tengan conocimientos informáticos.
+
+Los formularios deben solicitar solamente la información necesaria para cada operación.
+
+## RNF-02. Consistencia de datos
+
+Las operaciones que modifican inventario deben ejecutarse de manera transaccional.
+
+Si una operación falla, no debe quedar registrada parcialmente.
+
+Las existencias nunca deben quedar negativas. Esto se valida para cada combinación de lote y presentación, no solamente para el total del producto o del lote.
+
+La integridad se protege en dos niveles (§5.7):
+- Restricciones de la base de datos: claves foráneas simples y compuestas, índices únicos y restricciones `CHECK`.
+- Reglas del servicio de inventario.
+
+Las operaciones están protegidas contra movimientos simultáneos (bloqueo de lotes con aislamiento `READ COMMITTED`) y contra envíos duplicados (token único por formulario). El procedimiento se describe en §5.6.
+
+## RNF-03. Seguridad
+
+- Acceso mediante autenticación. No hay registro público: el administrador crea los usuarios.
+- Contraseñas almacenadas de forma segura mediante los mecanismos del framework.
+- Límite de intentos de inicio de sesión.
+- Caducidad de la sesión inactiva. La duración se define en la Etapa 1.
+- Acceso privado solo desde dispositivos autorizados en la red Tailscale. No se utiliza Tailscale Funnel.
+- Validación de permisos en el servidor (§2.3).
+- Protección de las operaciones que modifican existencias.
+- Apache y MySQL escuchan únicamente en `127.0.0.1`. En MySQL también se desactiva el protocolo X (`mysqlx=OFF`), que por defecto escucha en todas las interfaces.
+- La base de datos no debe estar expuesta directamente a Internet ni a la red local.
+- La aplicación usa una cuenta de MySQL sin privilegios para modificar ni eliminar el historial de movimientos (§6.5).
+- En producción, el modo de depuración está desactivado y el archivo `.env` queda fuera de Git.
+- Si se pierde la tablet, se retira de la red Tailscale y se invalidan sus sesiones.
+
+## RNF-04. Disponibilidad
+
+Se asume que el entorno funcionará sin interrupciones el 99 % del tiempo.
+
+La aplicación dependerá de que la computadora de casa esté encendida y conectada a Internet.
+
+Preparación mínima del equipo:
+- Desactivar la suspensión y la hibernación.
+- Configurar las horas activas de Windows Update para evitar reinicios en horario de trabajo.
+- Ejecutar Apache, MySQL y Tailscale como servicios de Windows con inicio automático, sin depender de que haya una sesión de usuario abierta.
+
+Si la conexión entre la tablet y la computadora se interrumpe, el usuario no podrá operar normalmente.
+
+La primera versión no tendrá sincronización offline. Como contingencia, los movimientos se anotan en papel y se registran después con la fecha real en que ocurrieron (RF-03).
+
+## RNF-05. Copias de seguridad
+
+- Se genera una copia de la base de datos dos veces al día (13:00 y 23:30) con `mysqldump --single-transaction --no-tablespaces`, programada con el Programador de tareas de Windows y ejecutada como el sistema, de modo que funciona aunque nadie haya iniciado sesión.
+- Las credenciales de la cuenta de copias se guardan en un archivo de opciones con permisos NTFS restringidos, nunca en la línea de comandos ni en el script.
+- Las copias no permanecen en el disco de la base de datos original: se guardan en `D:\Respaldos\Inventario`, un disco físico distinto. **Por decisión del cliente, la primera versión solo tiene copias locales**: no cubren la pérdida del equipo entero (robo, incendio, fallo eléctrico grave). La copia en la nube o en un disco externo queda aplazada; el script admite añadir destinos (§13).
+- Se conservan aproximadamente 30 días de copias.
+- Todas las copias se cifran (7-Zip, AES-256, también los nombres), porque contienen hashes de contraseñas y costos y para que los mismos archivos puedan subirse después a la nube. La contraseña de cifrado la custodia el administrador fuera del equipo.
+- Cada copia incluye, en un archivo cifrado aparte, el `.env` (que contiene la clave de la aplicación y las credenciales), `httpd.conf`, `my.ini` y el código del proyecto como paquete de Git, porque el repositorio solo existe en el servidor. Nada de esto va a Git.
+- Se documenta cómo restaurar (`docs/RESTAURACION.md`) y se comprueba la restauración con `scripts/probar-restauracion.ps1` (Caso 10). La aplicación muestra la fecha de la última copia correcta y avisa al administrador pasadas 36 horas.
+
+## RNF-06. Mantenimiento
+
+El código debe organizarse de forma que permita añadir posteriormente:
+- Caja registradora.
+- Ventas.
+- Precios de venta.
+- Lectores de códigos de barras.
+- Facturación electrónica.
+- Otros dispositivos.
+
+No se deben desarrollar estas funciones ahora.
+
+---
+
+# 5. Diseño de la base de datos
+
+## 5.1. Convenciones
+
+- Motor InnoDB y juego de caracteres `utf8mb4`.
+- Identificadores y claves foráneas: `BIGINT UNSIGNED`, la convención de Laravel. Las columnas de una clave foránea compuesta tienen exactamente el mismo tipo y signo que las columnas referenciadas.
+- Cantidades, factores y existencias mínimas: enteros **con signo**, limitados con restricciones `CHECK`. En MySQL, una operación con un operando `UNSIGNED` produce un resultado `UNSIGNED`, y una cantidad negativa provocaría un error de rango.
+- Importes: `DECIMAL` sin `UNSIGNED` (obsoleto en MySQL 8), limitados con `CHECK`.
+- Booleanos: `TINYINT(1) NOT NULL`.
+- Todas las claves foráneas usan `ON DELETE RESTRICT`. Los registros con historial no se eliminan: se desactivan.
+- Las restricciones `CHECK` se crean en las migraciones mediante sentencias SQL explícitas, porque el constructor de esquemas de Laravel no las ofrece. Las columnas generadas son almacenadas.
+- Las columnas generadas no se asignan desde la aplicación.
+- Cada modelo declara explícitamente el nombre de su tabla, porque Laravel pluraliza en inglés.
+- La tabla de usuarios conserva el nombre estándar de Laravel: `users`.
+- Zona horaria de la aplicación: `America/Guayaquil`.
+
+## 5.2. Entidades
+
+### users
+
+| Campo | Tipo | Restricciones y notas |
+|---|---|---|
+| id | BIGINT UNSIGNED | Clave primaria |
+| name | VARCHAR(100) | |
+| email | VARCHAR(150) | Único. Identificador de inicio de sesión (pendiente: correo o nombre de usuario) |
+| password | VARCHAR(255) | Hash del framework |
+| rol | ENUM('admin','encargado') | |
+| puede_gestionar_catalogo | TINYINT(1) | Valor inicial 0 |
+| puede_ajustar_inventario | TINYINT(1) | Valor inicial 0 |
+| puede_revertir | TINYINT(1) | Valor inicial 0 |
+| activo | TINYINT(1) | Valor inicial 1 |
+| remember_token, created_at, updated_at | | Estándar del framework |
+
+### categorias
+
+| Campo | Tipo | Restricciones y notas |
+|---|---|---|
+| id | BIGINT UNSIGNED | Clave primaria |
+| nombre | VARCHAR(100) | Único |
+| descripcion | TEXT NULL | |
+| created_at, updated_at | TIMESTAMP | |
+
+### productos
+
+| Campo | Tipo | Restricciones y notas |
+|---|---|---|
+| id | BIGINT UNSIGNED | Clave primaria |
+| categoria_id | BIGINT UNSIGNED | FK → categorias |
+| nombre | VARCHAR(150) | Nombre descriptivo con variante y contenido. Sin restricción única (RF-01) |
+| marca | VARCHAR(100) NULL | |
+| controla_caducidad | TINYINT(1) | Valor inicial 1. No modificable si el producto tiene lotes o movimientos |
+| stock_minimo | INT NULL | `CHECK (stock_minimo IS NULL OR stock_minimo >= 0)`. En unidades base |
+| activo | TINYINT(1) | |
+| observaciones | TEXT NULL | |
+| created_at, updated_at | TIMESTAMP | |
+
+Índice: `(nombre)`, para búsquedas.
+
+### presentaciones
+
+| Campo | Tipo | Restricciones y notas |
+|---|---|---|
+| id | BIGINT UNSIGNED | Clave primaria |
+| producto_id | BIGINT UNSIGNED | FK → productos |
+| nombre | VARCHAR(50) | |
+| factor | INT | `CHECK (factor >= 1)`. No modificable si la presentación tiene movimientos |
+| es_base | TINYINT(1) | `CHECK (es_base = 0 OR factor = 1)`. No modificable |
+| producto_base | BIGINT UNSIGNED NULL | Generada: `IF(es_base = 1, producto_id, NULL)`. Única: como máximo una presentación base por producto |
+| activo | TINYINT(1) | |
+| created_at, updated_at | TIMESTAMP | |
+
+Índices únicos:
+- `(producto_id, nombre)`.
+- `(id, producto_id)`: destino de la clave foránea compuesta de `detalles_movimiento`.
+
+Que cada producto tenga al menos una presentación base no puede expresarse en MySQL sin triggers. Lo garantiza el servicio de catálogo, que crea el producto y su presentación base en la misma transacción.
+
+### codigos_barras
+
+| Campo | Tipo | Restricciones y notas |
+|---|---|---|
+| id | BIGINT UNSIGNED | Clave primaria |
+| presentacion_id | BIGINT UNSIGNED | FK → presentaciones |
+| codigo | VARCHAR(64) | Único en todo el catálogo |
+| created_at, updated_at | TIMESTAMP | |
+
+### lotes
+
+| Campo | Tipo | Restricciones y notas |
+|---|---|---|
+| id | BIGINT UNSIGNED | Clave primaria |
+| producto_id | BIGINT UNSIGNED | FK → productos |
+| codigo_lote | VARCHAR(50) NOT NULL | Valor inicial `''`, que significa "sin código" |
+| fecha_caducidad | DATE NULL | Obligatoria si el producto controla caducidad |
+| caducidad_clave | DATE | Generada: `COALESCE(fecha_caducidad, '9999-12-31')`. Solo para el índice único |
+| created_at, updated_at | TIMESTAMP | |
+
+Índices únicos:
+- `(producto_id, codigo_lote, caducidad_clave)`: identidad del lote.
+- `(id, producto_id)`: destino de la clave foránea compuesta de `detalles_movimiento`.
+
+Índice: `(fecha_caducidad)`.
+
+Se usan una cadena vacía y una columna generada en lugar de valores nulos, porque MySQL no considera duplicadas las filas que tienen valores nulos en un índice único.
+
+### movimientos
+
+Cabecera de cada operación. Es inmutable.
+
+| Campo | Tipo | Restricciones y notas |
+|---|---|---|
+| id | BIGINT UNSIGNED | Clave primaria |
+| tipo | ENUM('entrada','salida','conversion','ajuste','reversion') | |
+| motivo | ENUM('compra','carga_inicial','venta_entrega','danado','vencido','devolucion_proveedor','conteo_fisico','otro') NULL | `CHECK` de combinaciones válidas (tabla siguiente) |
+| fecha | DATETIME | Cuándo ocurrió. No puede ser futura |
+| usuario_id | BIGINT UNSIGNED | FK → users |
+| observacion | TEXT NULL | Obligatoria en ajustes, reversiones y con el motivo `otro` |
+| revierte_movimiento_id | BIGINT UNSIGNED NULL | FK → movimientos. Único: como máximo una reversión por movimiento |
+| token | CHAR(36) | Único. Protección contra envíos duplicados |
+| created_at | TIMESTAMP | Cuándo se registró. No existe `updated_at` |
+
+Índice: `(fecha)`.
+
+Combinaciones de tipo y motivo permitidas:
+
+| Tipo | Motivos |
+|---|---|
+| entrada | compra, carga_inicial, otro |
+| salida | venta_entrega, danado, vencido, devolucion_proveedor, otro |
+| ajuste | conteo_fisico, danado, otro |
+| conversion | Sin motivo |
+| reversion | Sin motivo |
+
+### detalles_movimiento
+
+Variaciones de existencias de cada operación. Es inmutable.
+
+| Campo | Tipo | Restricciones y notas |
+|---|---|---|
+| id | BIGINT UNSIGNED | Clave primaria |
+| movimiento_id | BIGINT UNSIGNED | FK → movimientos |
+| producto_id | BIGINT UNSIGNED | FK → productos |
+| lote_id | BIGINT UNSIGNED | FK compuesta `(lote_id, producto_id)` → `lotes(id, producto_id)` |
+| presentacion_id | BIGINT UNSIGNED | FK compuesta `(presentacion_id, producto_id)` → `presentaciones(id, producto_id)` |
+| cantidad | INT | `CHECK (cantidad <> 0)`. Con signo, en unidades de la presentación |
+| factor | INT | `CHECK (factor >= 1)`. Copia del factor de la presentación en el momento de la operación |
+| cantidad_base | BIGINT | Generada: `cantidad * factor`. Con signo |
+| costo_unitario | DECIMAL(12,4) NULL | `CHECK (costo_unitario IS NULL OR (costo_unitario >= 0 AND cantidad > 0))`. Por unidad de la presentación recibida. Solo en entradas |
+
+Índices: `(lote_id, presentacion_id)` y `(producto_id)`.
+
+Las claves foráneas compuestas garantizan que el lote y la presentación de cada detalle pertenecen al mismo producto.
+
+Ejemplos de cantidades:
+- Entrada de 10 cajas: +10 cajas (cantidad base +120).
+- Apertura de una caja: −1 caja (−12) y +12 botellas (+12).
+- Salida de 3 botellas: −3 botellas (−3).
+
+### configuracion
+
+| Campo | Tipo | Restricciones y notas |
+|---|---|---|
+| clave | VARCHAR(50) | Clave primaria |
+| valor | VARCHAR(255) | |
+| updated_at | TIMESTAMP | |
+
+Valor inicial: `dias_alerta_caducidad` = 30.
+
+Además se usan las tablas estándar del framework: sesiones, caché, restablecimiento de contraseñas y migraciones.
+
+## 5.3. Relaciones principales
+
+- Una categoría puede contener varios productos.
+- Un producto puede tener varias presentaciones, exactamente una de ellas base.
+- Una presentación puede tener varios códigos de barras.
+- Un producto puede tener varios lotes.
+- Un movimiento puede contener varios detalles.
+- Cada detalle afecta a un lote y a una presentación del mismo producto. La base de datos lo garantiza con claves foráneas compuestas.
+- Un usuario puede registrar varios movimientos.
+- Un movimiento puede ser revertido como máximo por una reversión.
+
+## 5.4. Cálculo de existencias
+
+Las existencias se derivan del historial de movimientos inmutables. No se mantiene una tabla independiente de saldos.
+
+- Existencia por lote y presentación = suma de `cantidad`. Así se obtienen, por ejemplo, las cajas cerradas y las unidades sueltas.
+- Existencia del lote en unidades base = suma de `cantidad_base`, calculada con el factor histórico de cada detalle.
+- Existencia física del producto = suma de las existencias base de todos sus lotes.
+- Existencia disponible del producto = suma de las existencias base de los lotes sin fecha de caducidad o con fecha de caducidad igual o posterior a la fecha actual.
+- Un lote con existencia cero está agotado y no aparece en las listas operativas.
+- La validación de negativos se hace siempre sobre la existencia actual, aunque el movimiento tenga una fecha pasada.
+- En PHP, el resultado de las sumas se convierte a entero.
+
+## 5.5. Reglas por tipo de movimiento
+
+| Tipo | Signo de las cantidades | Reglas |
+|---|---|---|
+| entrada | Todas positivas | Crea o reutiliza el lote según su identidad. Caducidad obligatoria si el producto la controla. Costo opcional |
+| salida | Todas negativas | Motivo obligatorio. De un lote vencido, solo con motivo `vencido` o `danado` |
+| conversion | Positivas y negativas | Un solo lote. La suma de `cantidad_base` es cero |
+| ajuste | Cualquiera | Requiere `puede_ajustar_inventario`, motivo y observación |
+| reversion | Negación exacta del original, con su factor | Requiere `puede_revertir` y observación. El original no puede estar revertido ni ser una reversión |
+
+Reglas comunes:
+- Ninguna combinación de lote y presentación queda negativa.
+- El factor de cada detalle es igual al de su presentación.
+- La fecha no es futura.
+- La carga inicial de existencias (Etapa 9) se registra como entradas con motivo `carga_inicial`.
+
+## 5.6. Concurrencia y envíos duplicados
+
+Todas las operaciones que registran movimientos las realiza un único servicio de inventario, con este procedimiento:
+
+1. Validar que el token del formulario tiene formato UUID y buscarlo:
+   - Si existe un movimiento con ese token, del mismo usuario y del mismo tipo, es un reenvío: se muestra el movimiento existente y no se registra nada.
+   - Si existe con otro usuario u otro tipo, es una anomalía: se rechaza con un error.
+2. Abrir una transacción, con hasta 3 intentos en caso de interbloqueo.
+3. Obtener los lotes afectados. En una entrada, si el lote no existe, se crea; si otro usuario lo creó simultáneamente, el índice único lo detecta y se reutiliza el lote existente.
+4. Bloquear las filas de los lotes afectados con `SELECT … FOR UPDATE`, en orden ascendente de identificador, para evitar interbloqueos.
+5. Validar las reglas de §5.5, los permisos y el vencimiento.
+6. Agrupar las variaciones por combinación de lote y presentación, consultar sus existencias actuales y rechazar la operación si alguna quedaría negativa.
+7. Insertar el movimiento y sus detalles, y confirmar la transacción.
+
+### Nivel de aislamiento
+
+Las conexiones de la aplicación usan `READ COMMITTED`. Así, la consulta de existencias posterior al bloqueo ve los últimos datos confirmados y se evitan bloqueos de rango innecesarios.
+
+En la Etapa 1 se comprobará cómo se configura en la versión de Laravel elegida. Si su conector de MySQL no ofrece la opción, se aplicará con un comando de inicialización de la conexión. Una prueba verifica que la conexión de la aplicación está en `READ-COMMITTED`.
+
+### Bloqueos
+
+Solo se bloquean filas de `lotes`. `SELECT … FOR UPDATE` requiere, además de `SELECT`, el privilegio `UPDATE` (o `DELETE` o `LOCK TABLES`) sobre la tabla, y la cuenta de la aplicación no lo tiene sobre `movimientos` (§6.5). Esto se comprobará en la Etapa 1 con la versión instalada de MySQL.
+
+Dos reversiones simultáneas del mismo movimiento quedan en fila por el bloqueo de sus lotes, y la segunda falla por el índice único de `revierte_movimiento_id`.
+
+### Errores de clave duplicada
+
+Un error de clave duplicada (MySQL 1062) se clasifica según el índice que lo provoca. No todo duplicado se trata como un reenvío válido.
+
+| Índice | Tratamiento |
+|---|---|
+| `movimientos.token` | Se consulta el movimiento por su token. Si es del mismo usuario y del mismo tipo, es un reenvío: se muestra el movimiento existente. Si no, se rechaza con un error |
+| Identidad del lote (`producto_id`, `codigo_lote`, `caducidad_clave`) | Se reutiliza el lote existente y la operación continúa |
+| `movimientos.revierte_movimiento_id` | Se rechaza: el movimiento ya fue revertido |
+| Cualquier otro | Se deshace la transacción y se informa del error |
+
+### Token del formulario
+
+- El servidor genera el token al mostrar cada formulario de movimiento.
+- El token solo queda guardado si la operación se confirma. Si falla, el usuario puede reintentar con el mismo formulario.
+- Como ayuda de interfaz, y no como garantía, se usa el patrón Post/Redirect/Get y el botón de envío se desactiva tras pulsarlo.
+
+## 5.7. Garantías de la base de datos y del servicio
+
+| Regla | Dónde se garantiza |
+|---|---|
+| Lote y presentación de un detalle pertenecen al mismo producto | Base de datos: claves foráneas compuestas |
+| Como máximo una presentación base por producto, con factor 1 | Base de datos: índice único sobre columna generada y `CHECK` |
+| Al menos una presentación base, creada con el producto | Servicio de catálogo |
+| Factor ≥ 1, cantidad ≠ 0, costo ≥ 0 solo en cantidades positivas, existencias mínimas ≥ 0 | Base de datos: `CHECK` |
+| Cantidad base igual a cantidad × factor | Base de datos: columna generada |
+| Identidad del lote | Base de datos: índice único |
+| Combinaciones de tipo y motivo | Base de datos: `CHECK` |
+| Como máximo una reversión por movimiento | Base de datos: índice único |
+| Como máximo un movimiento por token | Base de datos: índice único |
+| Historial sin modificaciones ni eliminaciones | Base de datos (permisos de la cuenta) y aplicación (modelos) |
+| Factor no modificable con movimientos; presentación base no modificable | Servicio de catálogo |
+| Control de caducidad no modificable con lotes o movimientos | Servicio de catálogo |
+| Factor del detalle igual al de su presentación | Servicio de inventario |
+| Sin existencias negativas por lote y presentación | Servicio de inventario: bloqueo y validación |
+| Fecha de movimiento no futura | Servicio de inventario (un `CHECK` no admite la fecha actual) |
+| Lotes vencidos solo con los motivos permitidos | Servicio de inventario |
+| Caducidad obligatoria si el producto la controla | Servicio de inventario |
+| Lotes creados solo dentro de una entrada | Servicio de inventario |
+| Permisos | Servidor: políticas de autorización |
+
+---
+
+# 6. Arquitectura técnica
+
+## 6.1. Tecnologías propuestas
+
+| Componente | Tecnología |
+|---|---|
+| Sistema operativo del servidor | Windows 10 Enterprise LTSC 2021 |
+| Lenguaje | PHP, en una versión compatible con la de Laravel (se fija en la Etapa 1) |
+| Framework | Laravel |
+| Base de datos | MySQL 8.4 LTS, como servicio de Windows |
+| Servidor web | Apache con PHP, como servicio de Windows (módulo o FastCGI: se decide en la Etapa 1) |
+| Interfaz | Blade |
+| Estilos | CSS y Bootstrap |
+| Interacciones | JavaScript |
+| Pruebas | PHPUnit contra una base MySQL independiente (`inventario_test`) |
+| Control de versiones | Git |
+| Acceso remoto y HTTPS | Tailscale (`tailscale serve`) |
+
+Se utilizarán versiones estables y compatibles entre sí al momento de iniciar la implementación. Se comprobarán los requisitos oficiales antes de instalar las dependencias.
+
+## 6.2. Arquitectura de la aplicación
+
+Se utilizará una aplicación web monolítica.
+
+Laravel se encargará de:
+- Mostrar las páginas.
+- Validar los formularios.
+- Gestionar las sesiones.
+- Aplicar las reglas de negocio.
+- Consultar y modificar MySQL.
+
+Blade generará las vistas y JavaScript gestionará las interacciones necesarias.
+
+No se necesita una API independiente ni un frontend separado para la primera versión.
+
+Todas las operaciones que registran movimientos pasan por un único servicio de inventario (§5.6). Ningún otro código inserta movimientos.
+
+Los modelos de movimientos y de detalles rechazan cualquier intento de actualización o eliminación.
+
+## 6.3. Acceso remoto
+
+### Definición
+
+La computadora de casa alojará:
+- La aplicación Laravel, servida por Apache.
+- La base de datos MySQL.
+
+La tablet se conectará mediante una red privada Tailscale.
+
+El acceso seguirá este recorrido:
+
+Tablet → Tailscale → `tailscale serve` (HTTPS) → Apache en 127.0.0.1 → Laravel → MySQL en 127.0.0.1.
+
+- `tailscale serve` publica la aplicación con un certificado HTTPS válido en `https://<equipo>.<tailnet>.ts.net` y la redirige al puerto local de Apache. Requiere tener activados MagicDNS y los certificados HTTPS en la consola de Tailscale.
+- No se utiliza Tailscale Funnel: la aplicación nunca queda expuesta a Internet público.
+- Apache y MySQL escuchan únicamente en 127.0.0.1. No se abren puertos en el router ni en el firewall de Windows.
+- La base de datos solamente acepta conexiones locales del propio servidor.
+- Laravel se configura para funcionar detrás del proxy local: proxy de confianza 127.0.0.1, URL de la aplicación con `https` y cookies de sesión seguras.
+- El administrador también accede desde la computadora de casa mediante la URL `ts.net`, no mediante `localhost`, para mantener coherentes las sesiones y los enlaces.
+
+La computadora deberá permanecer encendida y conectada a Internet cuando se necesite acceder desde la bodega.
+
+### Configuración efectiva
+
+La configuración efectiva es requisito previo de la Etapa 7 y del Caso 9 (§11), y tiene su propia comprobación. Comprende:
+- Instalar Tailscale en el servidor y en la tablet.
+- Activar MagicDNS y los certificados HTTPS.
+- Publicar la aplicación con `tailscale serve --bg`.
+- Verificar el acceso desde la tablet.
+
+## 6.4. Limitaciones de esta arquitectura
+
+- Si se apaga la computadora, el sistema deja de estar disponible.
+- Si falla Internet en casa, la tablet no podrá acceder.
+- Si falla Internet en la bodega, la tablet no podrá acceder.
+- No se contempla trabajo offline.
+- Se necesita mantener actualizado el sistema operativo, el framework y sus dependencias.
+- El servidor es una computadora personal con Windows 10 Enterprise LTSC 2021. La cuenta de Windows debe estar protegida con contraseña.
+
+La arquitectura podrá migrarse a un servidor dedicado o alojamiento externo si las necesidades del negocio cambian.
+
+## 6.5. Cuentas de MySQL
+
+| Cuenta | Uso | Privilegios |
+|---|---|---|
+| `root` | Administración del servidor | Solo conexión local |
+| `inventario_migra` | Ejecutar las migraciones manualmente | Definición de estructura (DDL) sobre la base de producción |
+| `inventario_app` | Aplicación en ejecución | Concedidos tabla por tabla (tabla siguiente) |
+| `inventario_backup` | Copias de seguridad | `SELECT`, `SHOW VIEW` y `TRIGGER` |
+| `inventario_test` | Pruebas automatizadas | Solo sobre la base `inventario_test` |
+
+Privilegios de `inventario_app`:
+
+| Tablas | Privilegios |
+|---|---|
+| `movimientos`, `detalles_movimiento` | `SELECT`, `INSERT` |
+| `productos`, `presentaciones`, `lotes`, `categorias`, `users`, `configuracion` | `SELECT`, `INSERT`, `UPDATE` |
+| `codigos_barras` y tablas de sesiones, caché y restablecimiento de contraseñas | `SELECT`, `INSERT`, `UPDATE`, `DELETE` |
+
+- Los privilegios se conceden tabla por tabla, y no sobre toda la base, porque un privilegio concedido a nivel de base no puede retirarse para una tabla concreta.
+- La aplicación no puede eliminar productos, presentaciones, lotes, categorías ni usuarios: se desactivan.
+- Un script de permisos, guardado en el repositorio, se ejecuta de nuevo después de cada migración que cree tablas.
+
+---
+
+# 7. Códigos de barras
+
+Los productos ya cuentan con códigos de barras, pero todavía no se ha comprobado si todos pueden utilizarse directamente.
+
+La primera implementación no necesita una integración especial.
+
+Se podrá registrar manualmente el código y asociarlo a una presentación.
+
+Cada código es único en todo el catálogo e identifica una presentación concreta. Es el identificador más fiable de un producto cuando existe.
+
+Posteriormente, se utilizará un lector compatible con la tablet.
+
+La primera alternativa a evaluar será un lector USB o Bluetooth que funcione como teclado y escriba el código escaneado en el campo seleccionado.
+
+Antes de comprarlo, se comprobará:
+- Compatibilidad con la tablet.
+- Compatibilidad con el navegador.
+- Lectura de los códigos utilizados por los productos.
+- Comportamiento del lector al finalizar cada escaneo.
+
+Se debe distinguir entre:
+- Código de la unidad individual.
+- Código de la caja.
+- Código de lote.
+- Código que contiene información adicional.
+
+No se debe asumir que todos los códigos contienen la fecha de caducidad.
+
+Si un producto y su caja tienen códigos diferentes, cada uno deberá asociarse a su presentación correspondiente.
+
+La impresión de etiquetas nuevas será una función posterior, necesaria solamente cuando el negocio requiera identificar artículos o empaques que no tengan un código aprovechable.
+
+---
+
+# 8. Reglas de negocio
+
+1. Todo producto tiene exactamente una presentación base, con factor 1, creada junto con el producto.
+2. Las presentaciones utilizan factores de conversión enteros y positivos.
+3. El factor de una presentación no puede modificarse después de que tenga movimientos.
+4. Cada lote pertenece a un producto y se identifica por producto, código de lote y fecha de caducidad.
+5. Los lotes solo se crean dentro de una entrada.
+6. Cada recepción registra el lote y, si el producto controla caducidad, la fecha de caducidad.
+7. El indicador de control de caducidad no puede modificarse cuando el producto tiene lotes o movimientos asociados.
+8. Un producto puede tener varios lotes con distintas fechas de caducidad.
+9. Las existencias se controlan por lote y presentación.
+10. Abrir una caja debe descontar la presentación de caja y aumentar la presentación individual.
+11. Las conversiones no modifican la cantidad total de unidades base y se aplican dentro del mismo lote.
+12. Las salidas deben estar asociadas a un lote.
+13. No se permiten existencias negativas en ninguna combinación de lote y presentación.
+14. Los movimientos confirmados no se modifican ni se eliminan.
+15. Las correcciones se realizan mediante ajustes o reversiones, que son movimientos nuevos.
+16. Un movimiento solo puede revertirse una vez, y una reversión no puede revertirse.
+17. La fecha de un movimiento puede ser anterior a su registro, pero nunca futura.
+18. Las alertas se calculan a partir de la fecha de caducidad y las existencias actuales.
+19. Un lote está vencido cuando su fecha de caducidad es anterior a la fecha actual en `America/Guayaquil`. Los lotes vencidos se identifican por separado y solo salen con motivo "Producto vencido" o "Producto dañado", o mediante un ajuste autorizado.
+20. El sistema recomienda retirar primero los lotes con caducidad más próxima.
+21. Cada movimiento debe identificar al usuario responsable.
+22. Los permisos se validan en el servidor. El catálogo, los ajustes y las reversiones requieren el rol de administrador o el permiso especial correspondiente.
+23. Un mismo envío de formulario no puede registrar más de un movimiento.
+24. El costo de compra y el precio de venta son conceptos independientes.
+25. Las operaciones que afectan al inventario deben ser atómicas y consistentes.
+
+---
+
+# 9. Diseño de pantallas
+
+La primera versión tendrá las siguientes secciones:
+
+## 9.1. Inicio
+
+- Indicadores generales.
+- Lotes próximos a caducar.
+- Lotes vencidos con existencia.
+- Productos con existencias bajas.
+- Movimientos recientes.
+
+## 9.2. Productos
+
+- Listado.
+- Búsqueda.
+- Filtros por categoría.
+- Registro, con aviso de posible duplicado y confirmación explícita.
+- Edición.
+- Presentaciones y códigos de barras asociados.
+
+El registro y la edición requieren el rol de administrador o `puede_gestionar_catalogo`.
+
+## 9.3. Inventario
+
+- Existencias por producto.
+- Existencias por presentación, por ejemplo, cajas cerradas y unidades sueltas.
+- Total en unidades base.
+- Existencia física y existencia disponible.
+- Consulta por lote.
+- Filtros por categoría y estado.
+
+## 9.4. Recepciones
+
+Formulario para registrar:
+- Producto.
+- Fecha de recepción.
+- Líneas, cada una con presentación, cantidad, código de lote, fecha de caducidad y costo de compra opcional.
+- Observaciones.
+
+## 9.5. Salidas
+
+Formulario para registrar:
+- Producto.
+- Lote, en orden FEFO y con sus existencias por presentación.
+- Presentación.
+- Cantidad.
+- Motivo, de la lista cerrada.
+- Observación.
+
+## 9.6. Conversiones
+
+Permite, dentro de un mismo lote:
+- Abrir cajas.
+- Convertir unidades en cajas cuando corresponda.
+- Consultar las cantidades resultantes.
+
+## 9.7. Caducidad
+
+Listado de lotes con existencia:
+- Vigentes.
+- Próximos a caducar.
+- Vencidos.
+
+Mostrar la fecha de cada lote y sus existencias por presentación.
+
+## 9.8. Historial
+
+Listado de movimientos con:
+- Fecha en que ocurrió.
+- Fecha de registro.
+- Tipo.
+- Producto.
+- Lote.
+- Cantidad.
+- Usuario.
+- Motivo.
+- Observación.
+
+## 9.9. Ajustes y reversiones
+
+- Registro de ajustes, para usuarios con `puede_ajustar_inventario`.
+- Corrección del código o la fecha de caducidad de un lote, para usuarios con `puede_ajustar_inventario`.
+- Reversión de un movimiento desde el historial, para usuarios con `puede_revertir`.
+
+## 9.10. Usuarios y configuración
+
+Solo para el administrador:
+- Alta, edición y activación de usuarios.
+- Asignación del rol y de los permisos especiales.
+- Periodo de alerta de caducidad.
+
+---
+
+# 10. Funciones fuera del alcance inicial
+
+No desarrollar todavía:
+
+- Caja registradora.
+- Registro de ventas.
+- Cobros y métodos de pago.
+- Facturación electrónica.
+- Gestión de clientes.
+- Devoluciones de clientes.
+- Gestión avanzada de proveedores.
+- Integración con sistemas contables.
+- Importación automática de catálogos.
+- Reconocimiento de etiquetas mediante IA.
+- Notificaciones push.
+- Aplicación móvil nativa.
+- Sincronización offline.
+- Cantidades fraccionarias, como venta por peso o a granel.
+- Múltiples bodegas.
+- Múltiples sucursales.
+- Multiempresa.
+
+El diseño debe evitar bloquear estas ampliaciones, pero no se deben construir anticipadamente.
+
+---
+
+# 11. Plan de implementación
+
+El desarrollo se realizará por etapas. Cada etapa debe quedar funcional y verificable antes de avanzar.
+
+## Etapa 1. Preparación
+
+- Fijar las versiones de Laravel y PHP, y crear el proyecto Laravel.
+- Instalar Apache con PHP y MySQL 8.4 como servicios de Windows, escuchando en 127.0.0.1 y con el protocolo X de MySQL desactivado.
+- Configurar Git.
+- Crear las cuentas de MySQL (§6.5) y la base de pruebas `inventario_test`.
+- Configurar la zona horaria `America/Guayaquil`.
+- Verificar la configuración de `READ COMMITTED` en la versión de Laravel instalada.
+- Configurar la autenticación, los roles y los permisos especiales.
+- Preparar el entorno de desarrollo y la suite de pruebas contra `inventario_test`.
+
+## Etapa 2. Catálogo
+
+- Categorías.
+- Productos, con aviso de posibles duplicados.
+- Presentaciones, con creación de la presentación base junto con el producto.
+- Factores de conversión, no modificables cuando la presentación tiene movimientos.
+- Control de caducidad, no modificable cuando el producto tiene lotes o movimientos.
+- Códigos de barras.
+
+## Etapa 3. Inventario y lotes
+
+- Registro de recepciones, con creación o reutilización de lotes.
+- Protección contra envíos duplicados y bloqueo de lotes.
+- Cálculo de existencias.
+- Consulta por lote.
+- Control de presentaciones.
+
+## Etapa 4. Movimientos
+
+- Salidas.
+- Conversiones.
+- Ajustes y corrección de datos de lotes.
+- Reversiones.
+- Historial.
+- Pruebas de concurrencia con procesos independientes.
+
+## Etapa 5. Caducidad
+
+- Cálculo de días restantes.
+- Clasificación de lotes.
+- Alertas.
+- Filtros.
+
+## Etapa 6. Panel principal
+
+- Indicadores.
+- Movimientos recientes.
+- Alertas prioritarias.
+
+## Etapa 7. Interfaz para tablet
+
+Requisito previo: la configuración efectiva de Tailscale (§6.3) y la verificación del acceso desde la tablet.
+
+- Diseño adaptable.
+- Formularios cómodos para pantalla táctil.
+- Pruebas en navegador móvil.
+- Pruebas de lectura de códigos cuando se disponga del lector.
+
+## Etapa 8. Endurecimiento y copias de seguridad
+
+- Revisión de los dispositivos autorizados en Tailscale y de la caducidad de sus claves.
+- Procedimiento para retirar una tablet perdida.
+- Configuración final de usuarios.
+- Preparación del equipo: suspensión, horas activas e inicio automático de los servicios.
+- Copias de seguridad.
+- Prueba de recuperación.
+
+## Etapa 9. Carga inicial y validación
+
+- Conteo físico de productos.
+- Registro de existencias iniciales por lote, como entradas con motivo "carga inicial".
+- Registro de fechas de caducidad.
+- Comparación entre inventario físico y sistema.
+- Corrección de diferencias.
+
+---
+
+# 12. Pruebas de aceptación
+
+Las pruebas automatizadas se ejecutan con PHPUnit contra una base MySQL independiente, `inventario_test`, con una cuenta que solo tiene privilegios sobre ella. Nunca se ejecutan contra la base de producción, y la suite se niega a ejecutarse si el nombre de la base no termina en `_test`.
+
+Las pruebas de concurrencia usan procesos PHP independientes. No envuelven los datos en transacciones de prueba, porque los otros procesos no los verían: los datos se limpian al terminar.
+
+Antes de considerar terminada la primera versión, deben comprobarse los siguientes casos.
+
+### Caso 1. Recepción de mercancía
+
+Se reciben 10 cajas de aceite con 12 botellas por caja.
+
+Resultado esperado:
+- 10 cajas.
+- 0 botellas sueltas.
+- 120 botellas totales.
+
+### Caso 2. Apertura de caja
+
+Se abre una caja y se retiran 7 botellas.
+
+Resultado esperado:
+- 9 cajas.
+- 5 botellas sueltas.
+- 113 botellas totales.
+
+### Caso 3. Recepción de un lote diferente
+
+Se recibe nuevamente aceite, pero con una fecha de caducidad distinta.
+
+Resultado esperado:
+- Se conserva el lote anterior.
+- Se registra un lote nuevo.
+- Las cantidades se pueden consultar por separado.
+
+### Caso 4. Salida de mercancía
+
+Se retiran 3 botellas de un lote.
+
+Resultado esperado:
+- Las existencias del lote disminuyen en 3.
+- El movimiento aparece en el historial.
+- Se identifica al usuario responsable.
+
+### Caso 5. Salida superior a las existencias
+
+Se intenta retirar una cantidad superior a la disponible.
+
+Resultado esperado:
+- La operación se rechaza.
+- Las existencias no cambian.
+- No queda un movimiento parcialmente registrado.
+
+### Caso 6. Caducidad
+
+Un lote tiene una fecha de caducidad dentro de los próximos 30 días.
+
+Resultado esperado:
+- Aparece en las alertas.
+- Se muestran su fecha y su cantidad disponible.
+
+### Caso 7. Producto vencido
+
+La fecha de caducidad de un lote ya pasó.
+
+Resultado esperado:
+- Se clasifica como vencido.
+- Se muestra por separado de los lotes vigentes.
+- No se permite una salida normal como si estuviera disponible para venta.
+
+### Caso 8. Conversión entre presentaciones
+
+Se convierte una cantidad de unidades sueltas en cajas completas.
+
+Resultado esperado:
+- Disminuyen las unidades sueltas.
+- Aumentan las cajas cerradas.
+- No cambia la cantidad total en unidades base.
+
+### Caso 9. Acceso desde tablet
+
+Requisito previo: configuración efectiva de Tailscale (§6.3).
+
+El administrador registra un movimiento desde la computadora.
+
+Resultado esperado:
+- La tablet puede consultar el movimiento actualizado.
+
+También debe comprobarse el caso inverso.
+
+### Caso 10. Copia de seguridad
+
+Se genera una copia de seguridad y se restaura en un entorno de prueba.
+
+Resultado esperado:
+- Se recuperan los productos, lotes y movimientos.
+- Las existencias reconstruidas coinciden con las originales.
+
+### Caso 11. Integridad entre lote y presentación
+
+Se intenta registrar un detalle con un lote de un producto y una presentación de otro.
+
+Resultado esperado:
+- La base de datos rechaza el registro.
+
+### Caso 12. Doble envío
+
+Se envía dos veces el mismo formulario de salida, con el mismo token.
+
+Resultado esperado:
+- Se registra un solo movimiento.
+- El segundo envío muestra el movimiento ya registrado.
+
+### Caso 13. Token reutilizado por otro usuario
+
+Otro usuario envía un formulario con un token ya utilizado.
+
+Resultado esperado:
+- La operación se rechaza con un error y no se presenta como registrada.
+
+### Caso 14. Salidas simultáneas
+
+Varios procesos independientes registran a la vez salidas del mismo lote y la misma presentación, por encima de la existencia total.
+
+Resultado esperado:
+- Solo se aceptan las salidas que caben en la existencia.
+- La existencia final nunca es negativa.
+
+### Caso 15. Mismo token en paralelo
+
+Dos procesos envían simultáneamente el mismo formulario.
+
+Resultado esperado:
+- Se registra un solo movimiento.
+
+### Caso 16. Negativo en una presentación
+
+Un lote tiene 9 cajas y 0 botellas sueltas. Se intenta registrar una salida de 3 botellas sueltas sin abrir una caja.
+
+Resultado esperado:
+- La operación se rechaza aunque la existencia total del lote sea suficiente.
+
+### Caso 17. Doble reversión
+
+Se intenta revertir dos veces el mismo movimiento.
+
+Resultado esperado:
+- La segunda reversión se rechaza.
+
+### Caso 18. Reversión de una entrada consumida
+
+Se intenta revertir una entrada cuya mercancía ya salió.
+
+Resultado esperado:
+- La reversión se rechaza y las existencias no cambian.
+
+### Caso 19. Cambio de factor
+
+Se intenta modificar el factor de una presentación que tiene movimientos.
+
+Resultado esperado:
+- El cambio se rechaza.
+
+### Caso 20. Cambio del control de caducidad
+
+Se intenta modificar el indicador de control de caducidad de un producto que tiene lotes.
+
+Resultado esperado:
+- El cambio se rechaza.
+
+### Caso 21. Presentación base
+
+Se registra un producto nuevo.
+
+Resultado esperado:
+- El producto queda creado con exactamente una presentación base, con factor 1.
+- No es posible dejar un producto sin presentación base ni con dos.
+
+### Caso 22. Recepción del mismo lote
+
+Se recibe mercancía con el mismo producto, código de lote y fecha de caducidad que un lote existente.
+
+Resultado esperado:
+- La mercancía se suma al lote existente.
+- No se crea un lote nuevo.
+
+### Caso 23. Conversión inválida
+
+Se intenta registrar una conversión que no conserva las unidades base.
+
+Resultado esperado:
+- La conversión se rechaza.
+
+### Caso 24. Salida de un lote vencido
+
+Se intenta registrar una salida por venta de un lote vencido y, después, una salida con motivo "Producto vencido".
+
+Resultado esperado:
+- La salida por venta se rechaza.
+- La salida con motivo "Producto vencido" se acepta.
+
+### Caso 25. Permisos especiales
+
+Un encargado sin permisos especiales intenta registrar un ajuste enviando directamente la petición al servidor. Después se le concede `puede_ajustar_inventario` y repite la operación.
+
+Resultado esperado:
+- El primer intento se rechaza en el servidor.
+- El segundo se acepta.
+
+### Caso 26. Historial protegido
+
+Con la cuenta `inventario_app`, se intenta modificar o eliminar un movimiento directamente en la base de datos.
+
+Resultado esperado:
+- MySQL deniega la operación por falta de privilegios.
+
+### Caso 27. Nivel de aislamiento
+
+Se consulta el nivel de aislamiento de la conexión de la aplicación.
+
+Resultado esperado:
+- La conexión funciona en `READ-COMMITTED`.
+
+### Caso 28. Protección de la base de producción
+
+Se intenta ejecutar la suite de pruebas con una base cuyo nombre no termina en `_test`.
+
+Resultado esperado:
+- La suite se niega a ejecutarse.
+
+---
+
+# 13. Decisiones y pendientes
+
+| Tema | Estado | Decisión |
+|---|---|---|
+| Una computadora y una bodega | Confirmado | Arquitectura centralizada en una computadora personal con Windows 10 Enterprise LTSC 2021. |
+| Acceso desde tablet | Confirmado | Aplicación web adaptable. |
+| Acceso desde Internet | Confirmado | Tailscale con `tailscale serve` (HTTPS), sin Funnel. |
+| Acceso desde la tablet | Confirmado (Etapa 7) | `https://<equipo>.<tailnet>.ts.net` mediante `tailscale serve`, con proxy de confianza 127.0.0.1, `APP_ENV=production`, `APP_DEBUG=false` y cookies seguras. Caso 9 comprobado en uso real. |
+| Servidor | Confirmado | Apache con PHP y MySQL 8.4 como servicios de Windows, en 127.0.0.1. |
+| Disponibilidad | Confirmado | Se asume el 99 %; contingencia en papel. |
+| Trabajo sin Internet | Confirmado | No habrá modo offline en la primera versión. |
+| Cantidades | Confirmado | Enteras en la primera versión. |
+| Cajas y unidades | Confirmado | Control por presentación y lote. |
+| Diferentes fechas por lote | Confirmado | Un lote se identifica por producto, código de lote y fecha de caducidad. |
+| Existencias | Confirmado | Derivadas de movimientos inmutables, sin tabla de saldos. |
+| Alertas | Confirmado | Pantalla principal, inicialmente 30 días, configurable. |
+| Vencimiento | Confirmado | Vencido cuando la caducidad es anterior a la fecha actual en `America/Guayaquil`. |
+| Devoluciones | Confirmado | Al proveedor, como salida. Las de clientes quedan fuera del alcance. |
+| Costos de compra | Confirmado | Opcionales, por unidad de la presentación recibida. |
+| Usuarios y permisos | Confirmado | Administrador y encargado, con tres permisos especiales. |
+| Cuentas de MySQL | Confirmado | Cuentas separadas; historial de solo inserción para la aplicación. |
+| Cuentas de MySQL definitivas | Confirmado (Etapa 7) | La aplicación usa `inventario_app`, las migraciones `inventario_migra` y las pruebas `inventario_test`. `php artisan inventario:verificar-permisos` comprueba el Caso 26 y que `SELECT … FOR UPDATE` se deniega sobre `movimientos` (solo se bloquea `lotes`). `root` sigue sin contraseña y solo acepta conexiones locales: ponerle una contraseña queda como mejora opcional. |
+| Escucha de MySQL en 127.0.0.1 | Confirmado | `bind-address=127.0.0.1` y `mysqlx=OFF` en `my.ini` (29-10-2026). MySQL solo escucha en 127.0.0.1:3306; el puerto 33060 está cerrado. |
+| Pruebas | Confirmado | Base MySQL independiente `inventario_test`. |
+| Código de barras | Pendiente de prueba | Asociación manual inicial. |
+| Lectores | Pendiente de compra | Evaluar un lector compatible con la tablet. Los formularios ya están preparados: Enter avanza de campo en lugar de enviar. Las pruebas con el lector real se harán cuando se disponga de él. |
+| Inventario inicial | Herramienta lista (Etapa 9); falta el conteo real | Pantalla Carga inicial (solo administrador): plantilla CSV, revisión sin guardar y registro atómico como entradas con motivo `carga_inicial`, una por producto. Las diferencias con el físico se corrigen con Ajustes (motivo `conteo_fisico`). Los datos de prueba se eliminaron de producción (30-10-2026). |
+| Versiones de Laravel y PHP; integración de Apache con PHP | Confirmado | Laravel 13, PHP 8.5 Thread Safe como módulo de Apache 2.4 (Apache Lounge VS18), MySQL 8.4 LTS. |
+| Componente de autenticación | Confirmado | Inicio de sesión propio de Laravel, sin registro ni recuperación por correo. |
+| Inicio de sesión por correo o por nombre de usuario | Confirmado | Correo electrónico. |
+| Duración de la sesión inactiva | Confirmado | 120 minutos. |
+| Puerto local de Apache | Confirmado | 8080. |
+| Restricciones del catálogo que dependen del historial | Confirmado (Etapa 3) | Factor no modificable con movimientos, control de caducidad no modificable con lotes o movimientos, y presentación no desactivable con existencias. Implementadas con bloqueo de filas frente a las entradas; Casos 19 y 20 cubiertos. |
+| Abrir caja y retirar en un solo paso | Confirmado (Etapa 4) | En dos pasos con atajo: la salida muestra «Abrir / convertir» en cada lote y, tras la conversión, vuelve a la salida del mismo producto. |
+| Forma de los ajustes | Confirmado (Etapa 4) | Por cantidad contada: la diferencia con lo registrado se calcula después de bloquear el lote. |
+| Registro de auditoría de las correcciones de lote | Opcional, aplazado | No se implementó en la Etapa 4. Si se necesita, una tabla con quién, cuándo, valor anterior y valor nuevo. |
+| Configuración del periodo de alerta | Confirmado (Etapa 5) | Pantalla /configuracion solo para el administrador, de 1 a 365 días; valor inicial 30. |
+| Aviso de caducidad en el menú | Confirmado (Etapa 5) | Contador de lotes vencidos o próximos a caducar con existencias, junto a «Caducidad». |
+| Panel principal | Confirmado (Etapa 6) | «Productos registrados» cuenta los activos; los movimientos recientes se ordenan por fecha de registro; el indicador «Bajo el mínimo» enlaza a un filtro del inventario. |
+| Copias en la nube o en disco externo | Aplazado (decisión del cliente) | Solo copias locales en `D:\Respaldos\Inventario`. `scripts/respaldo.ps1` tiene una lista de destinos: añadir otro es una línea. |
+| Copias de seguridad locales | Confirmado (Etapa 8) | Dos veces al día, cifradas, 30 días de retención, con aviso de la última copia en la aplicación (K1 a K3). |
+| Prueba de recuperación | Confirmado (Etapa 8) | `scripts\probar-restauracion.ps1` restaura la copia cifrada más reciente en una base temporal y compara con la real: resultado CORRECTO (Caso 10, 30-10-2026). |
+| Reinicio sin sesión de usuario | Confirmado (Etapa 8) | Apache, MySQL y Tailscale (modo desatendido) arrancan con Windows sin iniciar sesión; la tablet accede por `ts.net` tras el reinicio. |
+| Windows Update | Confirmado (Etapa 8) | Pausado indefinidamente por decisión del cliente (`scripts\pausar-windows-update.ps1`); las actualizaciones se instalan a mano. |
+| Gestión de usuarios | Confirmado (Etapa 8) | Pantalla Usuarios (solo administrador), Mi cuenta y `inventario:cerrar-sesiones`; siempre queda un administrador activo. |
+| Ubicación dentro de la bodega | No confirmada | No implementar todavía. |
+| Notificaciones externas | Posterior | Solo alertas en pantalla. |
+
+---
+
+# 14. Instrucciones para iniciar el desarrollo con Claude
+
+Este documento, en su versión 1.1, representa la especificación del proyecto e incorpora la revisión crítica de la versión 1.0.
+
+Antes de escribir el código de cada etapa, debes revisar críticamente el diseño y señalar posibles inconsistencias.
+
+Presta especial atención a:
+
+1. La relación entre productos, presentaciones y lotes.
+2. La manera de representar cajas cerradas y unidades sueltas.
+3. La conversión entre presentaciones.
+4. El cálculo de existencias a partir de movimientos.
+5. La conservación del costo de compra histórico.
+6. La prevención de existencias negativas.
+7. El tratamiento de lotes vencidos.
+8. La seguridad de las operaciones concurrentes.
+9. La arquitectura de acceso remoto.
+
+No debes asumir que el modelo de datos propuesto es perfecto.
+
+Si detectas un problema, explica su consecuencia y propone una solución sencilla antes de implementarla.
+
+No amplíes el alcance por iniciativa propia.
+
+No implementes funciones fuera de la primera versión.
+
+No generes toda la aplicación en una sola operación.
+
+Trabaja por etapas, realiza pruebas y verifica cada módulo antes de continuar.
+
+Mantén el código legible y evita introducir dependencias o abstracciones innecesarias.
+
+El objetivo es construir un sistema pequeño, fiable y mantenible que resuelva el problema real de la bodega.
