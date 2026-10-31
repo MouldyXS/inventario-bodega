@@ -63,4 +63,4 @@ Para probar sin datos reales: `php artisan db:seed --class=SimulacroCanastaSeede
 
 ## Licencia
 
-`composer.json` declara la licencia MIT, como el esqueleto de Laravel. Aún no hay archivo `LICENSE`: añádelo si quieres que los términos queden explícitos.
+`composer.json` declara la licencia MIT, como el esqueleto de Laravel.
