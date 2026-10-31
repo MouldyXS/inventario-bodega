@@ -1,58 +1,66 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Inventario Bodega
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Sistema de inventario privado para una bodega pequeña en Ecuador, pensado para usarse desde una tablet. Registra qué entra, qué sale y qué hay, con control de lotes y caducidad.
 
-## About Laravel
+## El problema
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Una bodega de productos de consumo masivo (arroz, aceite, conservas, lácteos, limpieza) tiene dificultades que una hoja de cálculo no resuelve bien:
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- El mismo producto se maneja en **cajas y en unidades sueltas**, y abrir una caja cambia las dos cantidades a la vez.
+- Los productos perecederos llegan en **lotes con distinta caducidad**, y hay que sacar primero lo que vence antes.
+- **Varias personas** registran movimientos, a veces al mismo tiempo, y un toque doble en la tablet no debe duplicar una salida.
+- Los errores (un stock negativo, un registro borrado) deben ser imposibles o, al menos, quedar a la vista.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Cómo está pensado
 
-## Learning Laravel
+- **El historial es la verdad.** No existe una tabla de saldos: la existencia de cada lote y presentación se calcula siempre a partir de los movimientos, que nunca se editan ni se borran. Un error se corrige con otro movimiento (ajuste o reversión), y todo queda registrado.
+- **Producto, presentación y lote.** Un producto tiene presentaciones con un factor (caja x12 = 12 botellas) y sus unidades se reparten en lotes con su caducidad. Una caja y sus botellas son la misma existencia vista en distinta unidad.
+- **Un solo punto de escritura.** Un único servicio registra los movimientos, con token de idempotencia, transacción, bloqueo ordenado de filas y la regla de que ningún lote queda en negativo. Las pruebas de concurrencia lo ejercitan con procesos PHP independientes.
+- **La base también protege.** La cuenta de MySQL de la aplicación solo puede leer e insertar en el historial, y el resto de reglas se comprueban con restricciones en la propia base.
+- **Privado por diseño.** Funciona en un PC de la casa o la bodega: MySQL y Apache escuchan solo en local y el acceso desde la tablet es por Tailscale, sin exponer nada a Internet.
+- **Operable por una sola persona.** Copias cifradas automáticas con prueba de restauración, avisos en pantalla si falla una copia, y una guía de operación para los imprevistos (tablet perdida, reinicio, caída de Internet).
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Qué incluye
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- Catálogo con categorías, productos, presentaciones y códigos de barras.
+- Entradas, salidas (con sugerencia del lote que vence primero), conversiones de caja a unidades, ajustes por conteo físico y reversiones.
+- Panel de inicio, inventario, historial, y alertas de lotes vencidos, próximos a caducar y bajo el mínimo.
+- Usuarios con rol de administrador o encargado y permisos especiales.
+- Carga inicial de existencias por CSV, con revisión previa y registro todo o nada.
+- Interfaz táctil: botones grandes, accesos rápidos y formularios cómodos en tablet.
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+## Estado del proyecto
 
-## Agentic Development
+Se construye por etapas, con una especificación como autoridad (`docs/Requerimientos.txt`).
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+- **Hecho (etapas 1 a 8):** catálogo, movimientos, existencias, caducidad, panel, interfaz de tablet, acceso por Tailscale, usuarios, endurecimiento y copias de seguridad.
+- **En curso (etapa 9):** carga inicial y validación contra el conteo físico. La herramienta está lista y probada; falta cargar los datos reales de la bodega.
+- **Pendiente u opcional:** probar con un lector de códigos de barras, y copias en la nube o en disco externo.
+
+## Tecnología
+
+Laravel 13 y PHP 8.5, MySQL 8.4, plantillas Blade con Bootstrap, Apache 2.4, Tailscale. Pruebas con PHPUnit contra una base MySQL independiente.
+
+## Documentación
+
+- [`docs/Requerimientos.txt`](docs/Requerimientos.txt): especificación completa y decisiones de diseño.
+- [`docs/OPERACION.md`](docs/OPERACION.md): operación diaria y procedimientos.
+- [`docs/RESTAURACION.md`](docs/RESTAURACION.md): copias de seguridad y restauración.
+- [`CLAUDE.md`](CLAUDE.md): guía del proyecto para trabajar con asistentes de código.
+
+## Para desarrollarlo
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer install
+npm ci && npm run build
+cp .env.example .env
+php artisan key:generate
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Crea las cuentas de MySQL con `database/sql/01_cuentas.sql` (cambia las contraseñas de ejemplo), pon los datos de conexión en `.env`, y ejecuta `php artisan migrate`, `database/sql/02_permisos_app.sql` y `php artisan usuarios:crear` para el primer administrador.
 
-## Contributing
+Para probar sin datos reales: `php artisan db:seed --class=SimulacroCanastaSeeder` (productos de ejemplo de la canasta básica). Las pruebas: `php artisan test`; solo corren contra una base cuyo nombre termine en `_test`.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Licencia
 
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+`composer.json` declara la licencia MIT, como el esqueleto de Laravel. Aún no hay archivo `LICENSE`: añádelo si quieres que los términos queden explícitos.
