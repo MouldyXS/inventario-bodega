@@ -35,7 +35,7 @@ class ProxyTest extends TestCase
 
     public function test_desde_otra_direccion_las_cabeceras_se_ignoran(): void
     {
-        $this->withServerVariables(['REMOTE_ADDR' => '192.168.1.50'])
+        $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.50'])
             ->withHeaders(self::CABECERAS_TAILSCALE)
             ->get('/login')
             ->assertOk()
