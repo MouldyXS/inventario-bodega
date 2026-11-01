@@ -24,7 +24,8 @@ param(
     [string]$EstadoJson = 'C:\inventario\storage\app\respaldo-estado.json',
     [int]$DiasRetencion = 30,
     [string]$CarpetaRegistrosApache = 'C:\Apache24\logs',
-    [string[]]$ArchivosConfig = @('C:\inventario\.env', 'C:\Apache24\conf\httpd.conf', 'C:\ProgramData\MySQL\MySQL Server 8.4\my.ini'),
+    # Archivos y carpetas que van cifrados en config_….7z; la carpeta de imágenes de productos se guarda como productos\{id}\….
+    [string[]]$ArchivosConfig = @('C:\inventario\.env', 'C:\Apache24\conf\httpd.conf', 'C:\ProgramData\MySQL\MySQL Server 8.4\my.ini', 'C:\inventario\storage\app\private\productos'),
     [string]$MysqlDump = 'C:\Program Files\MySQL\MySQL Server 8.4\bin\mysqldump.exe',
     [string]$SieteZip = 'C:\Program Files\7-Zip\7z.exe',
     [string]$Git = 'C:\Program Files\Git\cmd\git.exe',

@@ -10,7 +10,7 @@ Requerimientos RNF-05 y Caso 10. Todo lo de esta página se ejecuta en el PC del
 | Dónde | `D:\Respaldos\Inventario` (otro disco físico distinto de C:) |
 | Retención | 30 días; lo anterior se borra solo |
 | `inventario_AAAAMMDD_HHMM.7z` | Volcado de la base de datos `inventario` |
-| `config_AAAAMMDD_HHMM.7z` | `.env`, `httpd.conf`, `my.ini` y el **código del proyecto** (`codigo_….bundle`, un repositorio de Git) |
+| `config_AAAAMMDD_HHMM.7z` | `.env`, `httpd.conf`, `my.ini`, las **imágenes de productos** (`productos\{id}\…`) y el **código del proyecto** (`codigo_….bundle`, un repositorio de Git) |
 | Cifrado | 7-Zip, AES-256, también los nombres de los archivos |
 
 **La contraseña de cifrado no está en ningún lugar recuperable de este PC.** Guárdala fuera de él (un gestor de contraseñas, o impresa en un lugar seguro). **Sin ella, las copias no se pueden abrir ni restaurar.**
@@ -36,7 +36,7 @@ Conviene hacerlo al instalar las copias, una vez al mes y después de cambios im
    powershell -ExecutionPolicy Bypass -File C:\inventario\scripts\probar-restauracion.ps1
    ```
 3. Escribe la contraseña de cifrado. El script descifra la copia más reciente, la carga en `inventario_restauracion` y compara con la base real: filas de cada tabla, existencia total, existencia por lote y presentación, movimientos y costos.
-4. Debe terminar con **CORRECTO**. Si se registraron movimientos después de la copia, saldrán diferencias esperables: repite la prueba justo después de una copia nueva.
+4. Debe terminar con **CORRECTO** y la línea «Imágenes: N correctas, 0 ausentes» (o «ningún producto tiene imagen»). Una imagen ausente es un aviso: ese producto se vería sin imagen. Si se registraron movimientos después de la copia, saldrán diferencias esperables: repite la prueba justo después de una copia nueva.
 
 ## Restaurar la base de datos (el PC está bien, los datos no)
 
@@ -56,13 +56,21 @@ Conviene hacerlo al instalar las copias, una vez al mes y después de cambios im
    cd C:\inventario
    php artisan inventario:verificar-permisos
    ```
-6. Arranca la aplicación (`Start-Service Apache2.4`), entra y revisa Inventario e Historial.
-7. Borra la carpeta temporal `C:\Temp\restauracion`: contiene el volcado sin cifrar.
+6. Restaura las imágenes de productos de la copia **con la misma fecha y hora** (`config_AAAAMMDD_HHMM.7z`), para que coincidan con la base:
+   ```
+   & "C:\Program Files\7-Zip\7z.exe" x -pCONTRASEÑA -oC:\inventario\storage\app\private -y D:\Respaldos\Inventario\config_AAAAMMDD_HHMM.7z "productos\*" -r
+   cd C:\inventario
+   php artisan inventario:imagenes-huerfanas            # lista imágenes que ya no usa ningún producto
+   php artisan inventario:imagenes-huerfanas --borrar   # y, si quieres, las borra
+   ```
+   La base guarda la versión de cada imagen, así que se vuelven a asociar solas.
+7. Arranca la aplicación (`Start-Service Apache2.4`), entra y revisa Inventario, Historial y alguna ficha de producto con imagen.
+8. Borra la carpeta temporal `C:\Temp\restauracion`: contiene el volcado sin cifrar.
 
 ## Reconstruir el servidor (el disco C: o el PC se perdió, D: sigue sano)
 
 1. Instala el software de §6.1 de la especificación: Windows, PHP 8.5 Thread Safe, Apache 2.4, MySQL 8.4 (servicio `MySQL84`), Composer, Git, Node, 7-Zip y Tailscale. La dirección `ts.net` puede cambiar si el PC tiene otro nombre.
-2. Descifra `config_….7z` más reciente. Contiene `codigo_….bundle`, `.env`, `httpd.conf` y `my.ini`.
+2. Descifra `config_….7z` más reciente. Contiene `codigo_….bundle`, `.env`, `httpd.conf`, `my.ini` y la carpeta `productos` (imágenes).
 3. Recupera el código: `git clone codigo_….bundle C:\inventario`. Después, en esa carpeta: `composer install` y `npm ci` y `npm run build`.
 4. Copia el `.env` a `C:\inventario\.env`, y `httpd.conf` y `my.ini` a sus carpetas (revisa que las rutas sigan siendo válidas).
 5. En MySQL: ejecuta `database\sql\01_cuentas.sql` con **las mismas contraseñas** que lleva el `.env` (o cámbialas en el `.env`), restaura el volcado como arriba y ejecuta `02_permisos_app.sql`.

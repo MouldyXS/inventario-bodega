@@ -14,7 +14,7 @@ Forma de trabajo acordada con el usuario:
 - No se amplía el alcance ni se reabren decisiones ya cerradas en §13. Todo se escribe en español: interfaz, mensajes, nombres de dominio y mensajes de commit.
 - Se hace un commit por cada bloque verificado (en `main`, sin remoto).
 
-Estado: las Etapas 1 a 8 están cerradas (incluye Usuarios, `inventario:cerrar-sesiones`, copias cifradas locales con `scripts/respaldo.ps1` y estado en JSON leído por la app, prueba de restauración, pausa de Windows Update; ver `docs/OPERACION.md` y `docs/RESTAURACION.md`). La Etapa 9 (carga inicial y validación) está en curso: `CargaInicialService` y la pantalla /carga-inicial (CSV, solo administrador) están hechas; falta el conteo y la carga reales del cliente, y cerrar la etapa. Pendiente de la Etapa 7: probar con un lector de códigos real cuando se compre.
+Estado: las Etapas 1 a 8 están cerradas (incluye Usuarios, `inventario:cerrar-sesiones`, copias cifradas locales con `scripts/respaldo.ps1` y estado en JSON leído por la app, prueba de restauración, pausa de Windows Update; ver `docs/OPERACION.md` y `docs/RESTAURACION.md`). La Etapa 9 (carga inicial y validación) está en curso: `CargaInicialService` y la pantalla /carga-inicial (CSV, solo administrador) están hechas; falta el conteo y la carga reales del cliente, y cerrar la etapa. Pendiente de la Etapa 7: probar con un lector de códigos real cuando se compre. El rediseño de la interfaz (8 etapas) está cerrado; para activar las imágenes de producto en producción faltan la migración y habilitar `gd`/`exif` en `php.ini` (ver `docs/OPERACION.md`).
 
 ## Entorno (Windows 10 Enterprise LTSC 2021)
 
@@ -36,6 +36,19 @@ vendor/bin/pint                                    # formato (pint --test solo c
 npm run build                                      # recompilar CSS/JS (Bootstrap vía Vite) tras tocar resources/css o resources/js
 php artisan migrate --database=migraciones         # migrar producción (conexión con la cuenta de DDL, §6.5)
 php artisan usuarios:crear                         # crear usuarios (interactivo; pide la contraseña sin mostrarla)
+php artisan inventario:imagenes-huerfanas          # imágenes de productos sin fila que las use (--borrar para borrarlas)
+```
+
+**Imágenes con GD/EXIF en desarrollo sin tocar `php.ini`** (lo comparten consola y Apache de producción): `php artisan test` lanza PHPUnit en un proceso hijo que **no** recibe las opciones `-d`, así que las pruebas de imágenes (que se omiten sin GD) se ejecutan con:
+
+```bash
+php -d extension=gd -d extension=exif vendor/phpunit/phpunit/phpunit
+```
+
+Servidor temporal con la base de pruebas y las extensiones (desde `public/`, porque el enrutador de Laravel toma `getcwd()` como carpeta pública; `artisan serve` tampoco reenvía `-d`):
+
+```bash
+cd public && APP_ENV=testing php -d extension=gd -d extension=exif -d upload_max_filesize=10M -d post_max_size=12M -S 127.0.0.1:8099 ../vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php
 ```
 
 Después de cambiar `.env` o algo en `config/`, conviene ejecutar `php artisan config:clear`.
@@ -95,4 +108,11 @@ Después de cambiar `.env` o algo en `config/`, conviene ejecutar `php artisan c
 - `AsegurarUsuarioActivo`, añadido al grupo `web` en `bootstrap/app.php`, expulsa en la siguiente petición a un usuario desactivado.
 - El inicio de sesión es propio (`Auth\LoginController`, con límite de intentos). No hay registro público ni recuperación de contraseña por correo.
 
-**Interfaz.** Blade + Bootstrap 5, con un layout en `resources/views/layouts/app.blade.php`. Debe poder usarse cómodamente en una tablet.
+**Interfaz.** Blade + Bootstrap 5.3 (sin más dependencias), con un layout en `resources/views/layouts/app.blade.php`. Debe poder usarse cómodamente en una tablet. Convenciones del rediseño:
+- **Tokens y temas** en `resources/css/app.css`: variables de Bootstrap redefinidas en `:root` y `[data-bs-theme=dark]`. El tema (`claro`, `oscuro`, `automatico`) lo fija `data-bs-theme` en `<html>`: un script en el `<head>` del layout evita el destello y `resources/js/app.js` escucha el cambio del sistema. No uses colores fijos (`bg-white`, `text-bg-light`, `table-danger` sin tokens): usa `bg-body`, `bg-body-secondary` y los tokens `--estado-*`.
+- **Navegación:** `layouts/_menu.blade.php` es la única definición del menú (barra lateral ≥ 1200 px y hoja «Más» en tablet y móvil); la barra inferior y la superior están en el layout. Iconos: sprite en `compartido/iconos.blade.php` (`<svg class="icono"><use href="#i-…"/></svg>`).
+- **Parciales y componentes:** `compartido/estado` (píldora con icono y texto: nunca solo color), `compartido/miniatura` (imagen `-t` o marcador), `compartido/vacio` (estado vacío con «Quitar filtros»), `compartido/cantidad` (− / +; mismo `<input>`), `compartido/motivo` (radios `name="motivo"`), `compartido/campo-clave` (Mostrar/Ocultar) y `<x-cabecera-pagina>` / `<x-cabecera-producto>`.
+- **Tablas apiladas:** clase `tabla-apilable` con `role` explícitos, `<caption class="visually-hidden">`, `<th scope="col">` y `data-etiqueta` en cada `<td>`; bajo 1024 px pasan a tarjeta solo con CSS. La primera celda y la de acciones llevan `data-etiqueta=""`. La cabecera se oculta solo visualmente.
+- **Formularios:** campos en una tarjeta y botones en `<div class="d-flex gap-2 barra-acciones">` (fija sobre la barra inferior en tablet). Filtros: la búsqueda siempre visible y el resto en `.filtros-extra` tras el botón «Filtros».
+- **Accesibilidad:** enlace «Saltar al contenido», foco visible de 3 px, bordes de campos ≥ 3:1 y contraste AA de texto en ambos temas. No añadas `opacity` a texto ni colores de Bootstrap sin comprobar el contraste.
+- **Cómo se audita** (sin dependencias): con el servidor temporal de arriba y la sesión iniciada, un script en el navegador carga cada pantalla en un `<iframe>` de 390, 820, 1180 y 1280 px, con `localStorage.tema` en `claro` y `oscuro`, calcula la razón de contraste de cada texto visible (4,5:1; 3:1 si es grande) y detecta desbordes (`documentElement.scrollWidth > clientWidth`). Debe dar cero fallos antes de cerrar un cambio visual. Las pruebas de PHP solo comprueban el marcado.

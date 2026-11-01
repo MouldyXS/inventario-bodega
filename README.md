@@ -34,6 +34,7 @@ Una bodega de productos de consumo masivo (arroz, aceite, conservas, lácteos, l
 Se construye por etapas, con una especificación como autoridad (`docs/Requerimientos.txt`).
 
 - **Hecho (etapas 1 a 8):** catálogo, movimientos, existencias, caducidad, panel, interfaz de tablet, acceso por Tailscale, usuarios, endurecimiento y copias de seguridad.
+- **Interfaz rediseñada:** barra lateral en PC y barra inferior en tablet y móvil, tema claro, oscuro y automático, tablas que se apilan como tarjetas, cantidades con botones − / + e imagen opcional de producto. Contraste AA y desbordes auditados en 25 pantallas.
 - **En curso (etapa 9):** carga inicial y validación contra el conteo físico. La herramienta está lista y probada; falta cargar los datos reales de la bodega.
 - **Pendiente u opcional:** probar con un lector de códigos de barras, y copias en la nube o en disco externo.
 
@@ -63,4 +64,4 @@ Para probar sin datos reales: `php artisan db:seed --class=SimulacroCanastaSeede
 
 ## Licencia
 
-`composer.json` declara la licencia MIT, como el esqueleto de Laravel.
+Código bajo licencia MIT (ver el archivo [LICENSE](LICENSE)).

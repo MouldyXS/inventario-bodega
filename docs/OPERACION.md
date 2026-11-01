@@ -23,6 +23,10 @@ cd C:\inventario ; php artisan inventario:verificar-permisos
 Get-PSDrive C        # espacio libre en C:
 ```
 
+## Tema claro, oscuro y automático
+
+El botón **Tema** (en la barra lateral, o en «Más» en la tablet) alterna entre automático, claro y oscuro. En **automático** sigue al sistema (la tablet), también si cambia mientras la aplicación está abierta; en claro u oscuro se queda fijo. La preferencia se guarda en ese navegador. En la barra lateral del PC, el botón junto al nombre la contrae a solo iconos.
+
 ## Si se pierde o roban la tablet
 
 1. **Retírala de Tailscale:** consola de Tailscale (login.tailscale.com) > *Machines* > la tablet > *Remove*. Sin eso, la tablet sigue dentro de la red privada.
@@ -59,6 +63,42 @@ La tablet no puede operar. Anota los movimientos en papel (producto, lote, caduc
 5. Revisa la tabla y pulsa **Confirmar y registrar**. Todo el archivo se registra junto o no se registra nada, con motivo «Carga inicial».
 6. Compara con el físico en **Inventario**. Para corregir diferencias usa **Ajustar** en el producto: muestra lo registrado, tú escribes lo contado y queda como ajuste con motivo «Conteo físico».
 7. Haz una copia nueva (`Start-ScheduledTask -TaskName InventarioRespaldo`) y repite la prueba de restauración.
+
+## Imágenes de productos
+
+El administrador puede añadir, cambiar o quitar una imagen en la ficha de cada producto; el resto de usuarios solo la ve. Se guardan en `C:\inventario\storage\app\private\productos` (privadas: solo se ven con sesión iniciada) y van en las copias (`config_….7z`).
+
+**Activarlas en producción (una vez, recomendado):** abre PowerShell **como administrador** y ejecuta
+
+```
+powershell -ExecutionPolicy Bypass -File C:\inventario\scripts\desplegar-imagenes.ps1
+```
+
+El script guarda una copia (`php.ini.antes-imagenes`), deja activas las cuatro directivas de abajo, comprueba con el propio `php.exe` que quedaron bien (si no, restaura la copia y se detiene), aplica la migración `productos.imagen` con la cuenta `inventario_migra`, reinicia Apache y ejecuta `inventario:verificar-permisos`. Es idempotente. Con `-SoloComprobar` (no hace falta ser administrador) muestra qué falta sin cambiar nada. Hazlo en una hora tranquila: Apache se reinicia unos segundos.
+
+Después comprueba en la aplicación, como administrador: **Configuración > Imágenes de productos** debe decir Sí / Sí / Sí y 10 MB / 12 MB; sube una foto desde la ficha de un producto (idealmente una hecha con la tablet) y comprueba que se ve bien orientada. Haz una copia (`Start-ScheduledTask -TaskName InventarioRespaldo`) y, cuando termine, ejecuta `scripts\probar-restauracion.ps1`: debe decir CORRECTO e «Imágenes: 1 correctas, 0 ausentes».
+
+**Volver atrás** (si algo no va bien): en PowerShell como administrador, `Copy-Item C:\php\php.ini.antes-imagenes C:\php\php.ini -Force` y `Restart-Service Apache2.4`. La aplicación sigue funcionando sin imágenes. La columna `imagen` puede quedarse (no estorba); si de verdad hay que quitarla: `php artisan migrate:rollback --database=migraciones --step=1 --force`.
+
+**Qué hace el script, a mano** (por si prefieres editar tú; `C:\php\php.ini` lo comparten la consola y Apache). Como administrador, edita el archivo y deja estas líneas así (sin `;` delante):
+
+```
+extension=gd
+extension=exif
+upload_max_filesize = 10M
+post_max_size = 12M
+```
+
+- **gd**: genera la miniatura y la versión media en WebP (viene con PHP, no se instala nada).
+- **exif**: corrige la orientación de las fotos de la cámara de la tablet; sin ella pueden verse giradas.
+- **10M / 12M**: la imagen admite hasta 8 MB; el formulario necesita algo más de margen.
+- `memory_limit` se deja en 128M: la aplicación calcula cuántos megapíxeles puede procesar con esa memoria (hasta 16 MP en JPEG y WebP; menos en PNG, que necesita casi el doble) y rechaza antes las fotos más grandes con un mensaje.
+
+Después reinicia Apache (`Restart-Service Apache2.4`) y comprueba en **Configuración > Imágenes de productos** que todo dice «Sí» y 10 MB / 12 MB (eso es lo que ve Apache). `php artisan inventario:verificar-permisos` muestra lo mismo para la consola.
+
+**Al cerrar sesión** la aplicación pide al navegador que borre su caché de este sitio (`Clear-Site-Data`): así otra persona en la misma tablet no ve imágenes guardadas. Borra toda la caché del sitio (también estilos y scripts, que se vuelven a descargar al entrar), no las cookies ni la preferencia de tema.
+
+**Imágenes huérfanas** (por ejemplo, tras restaurar una base más antigua): `php artisan inventario:imagenes-huerfanas` las lista y `--borrar` las borra.
 
 ## Windows Update
 

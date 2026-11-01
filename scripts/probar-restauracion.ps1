@@ -9,6 +9,8 @@
     3. Calcula una huella de la base original y de la restaurada: número de filas de cada tabla,
        existencia por lote y presentación, existencia total en unidades base y los movimientos.
     4. Muestra CORRECTO si coinciden o las diferencias, y borra la base temporal.
+    5. Comprueba que cada producto con imagen tiene sus archivos en el config_….7z de la misma copia
+       (aviso si faltan; no cambia el resultado).
 
     Ejecútalo justo después de una copia (Start-ScheduledTask InventarioRespaldo): si se registraron
     movimientos entre la copia y la prueba, habrá diferencias esperables. Usa mysql con la cuenta root
@@ -113,6 +115,36 @@ try {
         $filas += [pscustomobject]@{ Concepto = $o[0]; Original = $o[1]; Restaurada = $r[1]; Resultado = $(if ($igual) { 'igual' } else { 'DIFERENTE' }) }
     }
     $filas | Format-Table -AutoSize | Out-String | Write-Host
+
+    # 5. Imágenes de productos: cada producto con imagen en la base restaurada debe tener sus dos
+    #    archivos (productos\{id}\{version}-t.webp y -m.webp) en el config_….7z de la misma copia.
+    #    Las ausentes son un aviso, no un fallo: el producto se vería sin imagen.
+    try {
+        $conImagen = @(Invocar-Mysql @('-N', '-B', $BaseTemporal, '-e', 'SELECT id, imagen FROM productos WHERE imagen IS NOT NULL') | Where-Object { $_ })
+    } catch {
+        $conImagen = $null
+        Write-Host 'Imágenes: la copia es anterior a las imágenes de productos; no se comprueban.'
+    }
+    if ($null -ne $conImagen) {
+        $configCopia = Join-Path (Split-Path -Parent $Archivo) ((Split-Path -Leaf $Archivo) -replace '^inventario_', 'config_')
+        if ($conImagen.Count -eq 0) {
+            Write-Host 'Imágenes: ningún producto tiene imagen.'
+        } elseif (-not (Test-Path -LiteralPath $configCopia)) {
+            Write-Host "Imágenes: AVISO, no existe $configCopia para comprobarlas." -ForegroundColor Yellow
+        } else {
+            $carpetaImagenes = Join-Path $trabajo 'config'
+            & $SieteZip x "-p$clave" "-o$carpetaImagenes" -y $configCopia 'productos\*' -r | Out-Null
+            $correctas = 0
+            $ausentes = 0
+            foreach ($fila in $conImagen) {
+                $id, $version = $fila -split "`t"
+                $base = Join-Path $carpetaImagenes "productos\$id\$version"
+                if ((Test-Path -LiteralPath "$base-t.webp") -and (Test-Path -LiteralPath "$base-m.webp")) { $correctas++ } else { $ausentes++ }
+            }
+            $color = if ($ausentes -gt 0) { 'Yellow' } else { 'Green' }
+            Write-Host "Imágenes: $correctas correctas, $ausentes ausentes." -ForegroundColor $color
+        }
+    }
 
     if ($diferencias -eq 0) {
         Write-Host 'CORRECTO: la copia restaurada coincide con la base original (Caso 10).' -ForegroundColor Green
