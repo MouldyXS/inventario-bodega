@@ -3,9 +3,9 @@
 @section('titulo', $movimiento->tipo->etiqueta().' #'.$movimiento->id)
 
 @section('contenido')
-    <h1 class="h3 mb-3">{{ $movimiento->tipo->etiqueta() }} #{{ $movimiento->id }}</h1>
+    <x-cabecera-pagina :titulo="$movimiento->tipo->etiqueta().' #'.$movimiento->id" />
 
-    <dl class="row bg-white border rounded p-3 mx-0 mb-4">
+    <dl class="row bg-body border rounded p-3 mx-0 mb-4">
         <dt class="col-sm-3">Ocurrió</dt>
         <dd class="col-sm-9">{{ $movimiento->fecha->format('d/m/Y H:i') }}</dd>
         @if ($movimiento->created_at->format('Y-m-d H:i') !== $movimiento->fecha->format('Y-m-d H:i'))
@@ -41,28 +41,29 @@
     @endif
 
     <div class="table-responsive">
-        <table class="table align-middle bg-white">
-            <thead>
-                <tr>
-                    <th>Producto</th>
-                    <th>Lote</th>
-                    <th>Caducidad</th>
-                    <th class="text-end">Cantidad</th>
-                    <th>Presentación</th>
-                    <th class="text-end">Unidades base</th>
-                    <th class="text-end">Costo unitario</th>
+        <table class="table align-middle bg-body tabla-apilable" role="table">
+                <caption class="visually-hidden">Productos y lotes del movimiento</caption>
+            <thead role="rowgroup">
+                <tr role="row">
+                    <th scope="col" role="columnheader">Producto</th>
+                    <th scope="col" role="columnheader">Lote</th>
+                    <th scope="col" role="columnheader">Caducidad</th>
+                    <th scope="col" role="columnheader" class="text-end">Cantidad</th>
+                    <th scope="col" role="columnheader">Presentación</th>
+                    <th scope="col" role="columnheader" class="text-end">Unidades base</th>
+                    <th scope="col" role="columnheader" class="text-end">Costo unitario</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody role="rowgroup">
                 @foreach ($movimiento->detalles as $detalle)
-                    <tr>
-                        <td><a href="{{ route('inventario.show', $detalle->producto_id) }}">{{ $detalle->producto->nombre }}</a></td>
-                        <td>{{ $detalle->lote->etiqueta() }}</td>
-                        <td>{{ $detalle->lote->fecha_caducidad?->format('d/m/Y') ?? '—' }}</td>
-                        <td class="text-end">{{ $detalle->cantidad > 0 ? '+' : '' }}{{ $detalle->cantidad }}</td>
-                        <td>{{ $detalle->presentacion->nombre }}</td>
-                        <td class="text-end">{{ $detalle->cantidad_base }}</td>
-                        <td class="text-end">{{ $detalle->costo_unitario !== null ? '$'.number_format((float) $detalle->costo_unitario, 2) : '—' }}</td>
+                    <tr role="row">
+                        <td role="cell" data-etiqueta=""><a href="{{ route('inventario.show', $detalle->producto_id) }}">{{ $detalle->producto->nombre }}</a></td>
+                        <td role="cell" data-etiqueta="Lote">{{ $detalle->lote->etiqueta() }}</td>
+                        <td role="cell" data-etiqueta="Caducidad">{{ $detalle->lote->fecha_caducidad?->format('d/m/Y') ?? '—' }}</td>
+                        <td role="cell" data-etiqueta="Cantidad" class="text-end">{{ $detalle->cantidad > 0 ? '+' : '' }}{{ $detalle->cantidad }}</td>
+                        <td role="cell" data-etiqueta="Presentación">{{ $detalle->presentacion->nombre }}</td>
+                        <td role="cell" data-etiqueta="Unidades base" class="text-end">{{ $detalle->cantidad_base }}</td>
+                        <td role="cell" data-etiqueta="Costo unitario" class="text-end">{{ $detalle->costo_unitario !== null ? '$'.number_format((float) $detalle->costo_unitario, 2) : '—' }}</td>
                     </tr>
                 @endforeach
             </tbody>
@@ -82,7 +83,7 @@
     @if ($revertible)
         @can('revertir')
             <details class="card border-danger-subtle" @if ($errors->has('observacion')) open @endif>
-                <summary class="card-header bg-white text-danger">Revertir este movimiento</summary>
+                <summary class="card-header bg-body text-danger">Revertir este movimiento</summary>
                 <form method="POST" action="{{ route('reversiones.store', $movimiento) }}" class="card-body"
                       onsubmit="return confirm('¿Revertir el movimiento #{{ $movimiento->id }}? Se registrará un movimiento nuevo con las cantidades contrarias.')">
                     @csrf

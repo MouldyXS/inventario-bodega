@@ -196,6 +196,6 @@ class SimulacroCanastaSeeder extends Seeder
 
         $movimientos = $carga->registrar($admin, (string) Str::uuid(), $lectura['filas'], now());
 
-        $this->command?->info("Simulacro cargado: ".Producto::count()." productos, $movimientos movimientos.");
+        $this->command?->info('Simulacro cargado: '.Producto::count()." productos, $movimientos movimientos.");
     }
 }

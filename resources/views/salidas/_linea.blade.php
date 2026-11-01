@@ -1,8 +1,8 @@
 {{-- Una línea de la salida. $i es el índice o '__i__' en la plantilla. --}}
 @php($error = fn (string $campo) => is_int($i) ? $errors->first("lineas.$i.$campo") : '')
-<div class="card mb-2" data-linea>
+<div class="card mb-2 linea-movimiento" data-linea>
     <div class="card-body row g-2 align-items-start">
-        <div class="col-12 col-lg-6">
+        <div class="col-12 col-lg-5">
             <label class="form-label small mb-1" for="linea-{{ $i }}-lote">Lote</label>
             <select id="linea-{{ $i }}-lote" name="lineas[{{ $i }}][lote_id]"
                     class="form-select @if ($error('lote_id')) is-invalid @endif">
@@ -20,7 +20,7 @@
             </select>
             <div class="invalid-feedback">{{ $error('lote_id') }}</div>
         </div>
-        <div class="col-7 col-lg-3">
+        <div class="col-12 col-sm-6 col-lg-3">
             <label class="form-label small mb-1" for="linea-{{ $i }}-presentacion">Presentación</label>
             <select id="linea-{{ $i }}-presentacion" name="lineas[{{ $i }}][presentacion_id]"
                     class="form-select @if ($error('presentacion_id')) is-invalid @endif">
@@ -33,15 +33,12 @@
             </select>
             <div class="invalid-feedback">{{ $error('presentacion_id') }}</div>
         </div>
-        <div class="col-5 col-lg-2">
+        <div class="col-12 col-sm-6 col-lg-3">
             <label class="form-label small mb-1" for="linea-{{ $i }}-cantidad">Cantidad</label>
-            <input type="number" id="linea-{{ $i }}-cantidad" name="lineas[{{ $i }}][cantidad]" min="1" step="1"
-                   inputmode="numeric" value="{{ $linea['cantidad'] ?? '' }}"
-                   class="form-control @if ($error('cantidad')) is-invalid @endif">
-            <div class="invalid-feedback">{{ $error('cantidad') }}</div>
+            @include('compartido.cantidad', ['id' => "linea-{$i}-cantidad", 'name' => "lineas[{$i}][cantidad]", 'min' => 1, 'valor' => $linea['cantidad'] ?? '', 'error' => $error('cantidad')])
         </div>
         <div class="col-12 col-lg-1 text-end">
-            <button type="button" class="btn btn-link btn-sm text-danger p-0 mt-lg-4" data-quitar-linea>Quitar</button>
+            <button type="button" class="btn btn-link btn-sm text-danger mt-lg-3" data-quitar-linea>Quitar</button>
         </div>
     </div>
 </div>

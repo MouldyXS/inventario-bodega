@@ -1,11 +1,947 @@
 @import 'bootstrap/dist/css/bootstrap.min.css';
 
+/*
+ * Tokens visuales: sobrios, un solo color de marca y estados semánticos.
+ * Se apoyan en las variables de Bootstrap, así que los componentes existentes
+ * los heredan sin cambiar su marcado. El tema lo fija data-bs-theme en <html>.
+ */
+:root,
+[data-bs-theme='light'] {
+    --marca: #3b5bdb;
+    --marca-rgb: 59, 91, 219;
+    --bs-primary: var(--marca);
+    --bs-primary-rgb: var(--marca-rgb);
+    --bs-link-color: #3451c7;
+    --bs-link-color-rgb: 52, 81, 199;
+    --bs-link-hover-color: #2a41a3;
+    --bs-link-hover-color-rgb: 42, 65, 163;
+    --bs-body-color: #1d2433;
+    --bs-body-color-rgb: 29, 36, 51;
+    --bs-body-bg: #ffffff;
+    --bs-body-bg-rgb: 255, 255, 255;
+    --bs-secondary-bg: #eef1f6;
+    --bs-secondary-bg-rgb: 238, 241, 246;
+    --bs-tertiary-bg: #f3f5f9;
+    --bs-tertiary-bg-rgb: 243, 245, 249;
+    --bs-border-color: #dde2ec;
+    --bs-secondary-color: rgba(29, 36, 51, 0.72);
+    --bs-border-radius: 0.625rem;
+    --bs-border-radius-sm: 0.5rem;
+    --bs-border-radius-lg: 0.875rem;
+    --sombra-tarjeta: 0 1px 2px rgba(16, 24, 40, 0.05);
+    --borde-campo: #7d8798;
+    --alto-barra-inferior: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+    --ancho-lateral: 15rem;
+    --ancho-lateral-compacto: 4.5rem;
+}
+
+[data-bs-theme='dark'] {
+    --marca: #4263eb;
+    --marca-rgb: 76, 110, 245;
+    --bs-primary: #748ffc;
+    --bs-primary-rgb: 116, 143, 252;
+    --bs-link-color: #8ea4fd;
+    --bs-link-color-rgb: 142, 164, 253;
+    --bs-link-hover-color: #b0bffe;
+    --bs-link-hover-color-rgb: 176, 191, 254;
+    --bs-body-color: #e4e8f1;
+    --bs-body-color-rgb: 228, 232, 241;
+    --bs-body-bg: #171b24;
+    --bs-body-bg-rgb: 23, 27, 36;
+    --bs-secondary-bg: #222836;
+    --bs-secondary-bg-rgb: 34, 40, 54;
+    --bs-tertiary-bg: #0f1218;
+    --bs-tertiary-bg-rgb: 15, 18, 24;
+    --bs-border-color: #2c3345;
+    --bs-secondary-color: rgba(228, 232, 241, 0.72);
+    --sombra-tarjeta: none;
+    --borde-campo: #7c869c;
+    color-scheme: dark;
+}
+
+/* Botón principal y su contorno con el color de marca (Bootstrap los fija en Sass). */
+.btn-primary {
+    --bs-btn-bg: var(--marca);
+    --bs-btn-border-color: var(--marca);
+    --bs-btn-hover-bg: #304cc0;
+    --bs-btn-hover-border-color: #2d46b3;
+    --bs-btn-active-bg: #2d46b3;
+    --bs-btn-active-border-color: #2840a1;
+    --bs-btn-disabled-bg: var(--marca);
+    --bs-btn-disabled-border-color: var(--marca);
+    --bs-btn-focus-shadow-rgb: var(--marca-rgb);
+}
+
+.btn-outline-primary {
+    --bs-btn-color: var(--bs-link-color);
+    --bs-btn-border-color: var(--bs-link-color);
+    --bs-btn-hover-bg: var(--marca);
+    --bs-btn-hover-border-color: var(--marca);
+    --bs-btn-hover-color: #fff;
+    --bs-btn-active-bg: #2d46b3;
+    --bs-btn-active-border-color: #2d46b3;
+    --bs-btn-active-color: #fff;
+    --bs-btn-disabled-color: var(--bs-link-color);
+    --bs-btn-disabled-border-color: var(--bs-link-color);
+    --bs-btn-focus-shadow-rgb: var(--marca-rgb);
+}
+
+[data-bs-theme='dark'] .btn-primary {
+    --bs-btn-hover-bg: #3b5bdb;
+    --bs-btn-hover-border-color: #3b5bdb;
+    --bs-btn-active-bg: #364fc7;
+    --bs-btn-active-border-color: #364fc7;
+}
+
+[data-bs-theme='dark'] .btn-outline-primary {
+    --bs-btn-hover-bg: var(--marca);
+    --bs-btn-active-bg: #3b5bdb;
+    --bs-btn-active-border-color: #3b5bdb;
+}
+
+/* Rojo y verde de texto y contorno con contraste AA en cada tema (Bootstrap los fija con un solo tono). */
+.btn-outline-danger {
+    --bs-btn-color: #b02a37;
+    --bs-btn-border-color: #b02a37;
+    --bs-btn-hover-bg: #b02a37;
+    --bs-btn-hover-border-color: #b02a37;
+    --bs-btn-active-bg: #9b2330;
+    --bs-btn-active-border-color: #9b2330;
+    --bs-btn-disabled-color: #b02a37;
+    --bs-btn-disabled-border-color: #b02a37;
+}
+
+[data-bs-theme='dark'] .text-danger {
+    color: #ff7878 !important;
+}
+
+[data-bs-theme='dark'] .text-success {
+    color: #4dc480 !important;
+}
+
+[data-bs-theme='dark'] .btn-outline-danger {
+    --bs-btn-color: #ff7878;
+    --bs-btn-border-color: #ff7878;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #c92a3a;
+    --bs-btn-hover-border-color: #c92a3a;
+    --bs-btn-active-bg: #b02a37;
+    --bs-btn-active-border-color: #b02a37;
+    --bs-btn-disabled-color: #ff7878;
+    --bs-btn-disabled-border-color: #ff7878;
+}
+
+/* En oscuro, --bs-primary se aclara para texto y enlaces; las insignias conservan el fondo de marca. */
+[data-bs-theme='dark'] .text-bg-primary {
+    background-color: var(--marca) !important;
+    color: #fff !important;
+}
+
+/* Tipografía y superficies. */
+body {
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+.h1,
+.h2,
+.h3 {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+/* Cifras alineadas en cantidades y columnas numéricas. */
+.text-end,
+.fs-2,
+.badge {
+    font-variant-numeric: tabular-nums;
+}
+
+.card,
+.list-group-item,
+.table-responsive > .table,
+dl.bg-body {
+    box-shadow: var(--sombra-tarjeta);
+}
+
+.card {
+    --bs-card-border-color: var(--bs-border-color);
+}
+
+.table {
+    --bs-table-border-color: var(--bs-border-color);
+}
+
+.table > thead > tr > th {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--bs-secondary-color);
+}
+
+/*
+ * Foco visible y consistente en teclado: anillo de 3 px con el color de enlace del tema (contraste ≥ 3:1 en
+ * claro y oscuro). Bootstrap anula el contorno de botones y campos y deja solo una sombra translúcida.
+ */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible,
+.btn:focus-visible,
+.btn-check:focus-visible + .btn,
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus,
+.stepper__boton:focus-visible,
+.enlace-menu:focus-visible,
+.btn-icono:focus-visible {
+    outline: 3px solid var(--bs-link-color);
+    outline-offset: 2px;
+    box-shadow: none;
+}
+
+/* Bordes de campos y casillas con contraste ≥ 3:1 frente al fondo (WCAG 1.4.11). */
+.form-control,
+.form-select,
+.form-check-input,
+.stepper__boton {
+    border-color: var(--borde-campo);
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--bs-link-color);
+}
+
+/* El destino del salto recibe el foco para que el teclado continúe desde ahí, sin recuadro. */
+#contenido:focus,
+#contenido:focus-visible {
+    outline: 0;
+}
+
+/* Enlace «Saltar al contenido»: solo visible al enfocarlo con el teclado. */
+.saltar-contenido:focus {
+    position: fixed;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 2000;
+    padding: 0.6rem 1rem;
+    border-radius: var(--bs-border-radius);
+    background: var(--bs-body-bg);
+    color: var(--bs-link-color);
+    font-weight: 600;
+}
+
+/* Iconos del sprite (compartido/iconos.blade.php). */
+.icono {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Menú: barra lateral (xl y más) y hoja «Más» comparten estos enlaces. */
+.enlace-menu {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0.4rem 0.75rem;
+    border: 0;
+    border-radius: var(--bs-border-radius);
+    background: none;
+    color: var(--bs-body-color);
+    font-size: 0.95rem;
+    text-align: left;
+    text-decoration: none;
+}
+
+.enlace-menu:hover {
+    background: var(--bs-secondary-bg);
+    color: var(--bs-body-color);
+}
+
+.enlace-menu.active {
+    background: rgba(var(--marca-rgb), 0.12);
+    color: var(--bs-link-color);
+    font-weight: 600;
+}
+
+.titulo-seccion {
+    padding: 0.9rem 0.75rem 0.25rem;
+    color: var(--bs-secondary-color);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.pie-menu {
+    position: sticky;
+    bottom: 0;
+    margin-top: auto;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--bs-border-color);
+    background: var(--bs-body-bg);
+}
+
+.pie-menu form {
+    margin: 0;
+}
+
+.marca {
+    overflow: hidden;
+    color: var(--bs-body-color);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.btn-icono {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: var(--bs-border-radius);
+    background: none;
+    color: var(--bs-secondary-color);
+}
+
+.btn-icono:hover {
+    background: var(--bs-secondary-bg);
+    color: var(--bs-body-color);
+}
+
+/* Barra lateral (PC). */
+.barra-lateral {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 1030;
+    width: var(--ancho-lateral);
+    flex-direction: column;
+    border-right: 1px solid var(--bs-border-color);
+    background: var(--bs-body-bg);
+}
+
+.barra-lateral__cabecera {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-height: 3.5rem;
+    padding: 0 0.5rem 0 1rem;
+}
+
+.barra-lateral__menu {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: 0.25rem 0.5rem 0.75rem;
+    overflow-y: auto;
+}
+
+@media (min-width: 1200px) {
+    .app-contenido {
+        margin-left: var(--ancho-lateral);
+    }
+
+    html[data-menu='compacto'] .app-contenido {
+        margin-left: var(--ancho-lateral-compacto);
+    }
+
+    html[data-menu='compacto'] .barra-lateral {
+        width: var(--ancho-lateral-compacto);
+    }
+
+    html[data-menu='compacto'] .barra-lateral__cabecera {
+        justify-content: center;
+        padding: 0;
+    }
+
+    html[data-menu='compacto'] .barra-lateral .marca,
+    html[data-menu='compacto'] .barra-lateral .enlace-menu__texto,
+    html[data-menu='compacto'] .barra-lateral .titulo-seccion {
+        display: none;
+    }
+
+    html[data-menu='compacto'] .barra-lateral .enlace-menu {
+        justify-content: center;
+        padding-inline: 0;
+    }
+
+    html[data-menu='compacto'] .barra-lateral .enlace-menu .badge {
+        position: absolute;
+        top: 0.1rem;
+        right: 0.3rem;
+        font-size: 0.65rem;
+    }
+}
+
+/* Barra superior (tablet y móvil). */
+.barra-superior {
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+    display: flex;
+    align-items: center;
+    height: 3rem;
+    padding: 0 1rem;
+    border-bottom: 1px solid var(--bs-border-color);
+    background: var(--bs-body-bg);
+}
+
+/* Barra inferior de accesos rápidos (por debajo de xl, donde no hay barra lateral). */
+.barra-inferior {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 1030;
+    display: flex;
+    height: var(--alto-barra-inferior);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    border-top: 1px solid var(--bs-border-color);
+    background: var(--bs-body-bg);
+}
+
+.barra-inferior a,
+.barra-inferior button {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    border: 0;
+    background: none;
+    color: var(--bs-secondary-color);
+    font-size: 0.75rem;
+    text-decoration: none;
+}
+
+.barra-inferior a.active {
+    color: var(--bs-link-color);
+    font-weight: 600;
+    box-shadow: inset 0 3px 0 var(--marca);
+}
+
+.icono-con-aviso {
+    position: relative;
+    display: inline-flex;
+}
+
+.aviso-punto {
+    position: absolute;
+    top: -2px;
+    right: -4px;
+    width: 0.65rem;
+    height: 0.65rem;
+    border: 2px solid var(--bs-body-bg);
+    border-radius: 50%;
+    background: #f59f00;
+}
+
+/* Hoja «Más»: por encima de las barras, con el contenido a su altura. */
+.offcanvas.hoja-mas {
+    height: auto;
+    max-height: 85vh;
+    border-radius: var(--bs-border-radius-lg) var(--bs-border-radius-lg) 0 0;
+}
+
+@media (max-width: 1199.98px) {
+    body {
+        padding-bottom: var(--alto-barra-inferior);
+    }
+
+    /* El botón de registrar queda a la vista aunque la lista de líneas sea larga. */
+    .barra-acciones {
+        position: sticky;
+        bottom: var(--alto-barra-inferior);
+        z-index: 1020;
+        margin: 0 -0.75rem;
+        padding: 0.75rem;
+        background: var(--bs-tertiary-bg);
+        border-top: 1px solid var(--bs-border-color);
+    }
+}
+
+/* Píldora de estado (compartido/estado.blade.php): icono + texto, color solo de refuerzo. */
+:root,
+[data-bs-theme='light'] {
+    --estado-peligro-fondo: #fde8e8;
+    --estado-peligro-texto: #a4231a;
+    --estado-aviso-fondo: #fff1cc;
+    --estado-aviso-texto: #7a4a00;
+    --estado-exito-fondo: #e0f5e8;
+    --estado-exito-texto: #1a6a3a;
+}
+
+[data-bs-theme='dark'] {
+    --estado-peligro-fondo: rgba(240, 82, 82, 0.18);
+    --estado-peligro-texto: #ffa3a3;
+    --estado-aviso-fondo: rgba(245, 159, 0, 0.18);
+    --estado-aviso-texto: #ffd27a;
+    --estado-exito-fondo: rgba(47, 179, 102, 0.18);
+    --estado-exito-texto: #7be0a5;
+}
+
+.estado {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.6rem 0.15rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.estado .icono {
+    width: 1rem;
+    height: 1rem;
+}
+
+.estado--peligro { background: var(--estado-peligro-fondo); color: var(--estado-peligro-texto); }
+.estado--aviso { background: var(--estado-aviso-fondo); color: var(--estado-aviso-texto); }
+.estado--exito { background: var(--estado-exito-fondo); color: var(--estado-exito-texto); }
+.estado--neutro { background: var(--bs-secondary-bg); color: var(--bs-secondary-color); }
+.estado--marca { background: rgba(var(--marca-rgb), 0.14); color: var(--bs-link-color); }
+
+/* Filas de tabla con estado: Bootstrap las fija en claro; aquí siguen los tokens de cada tema. */
+.table-danger,
+.table-warning,
+.table-success {
+    --bs-table-color: var(--bs-body-color);
+    --bs-table-border-color: var(--bs-border-color);
+}
+
+.table-danger {
+    --bs-table-bg: var(--estado-peligro-fondo);
+    --bs-table-hover-bg: var(--estado-peligro-fondo);
+    --bs-table-hover-color: var(--bs-body-color);
+}
+
+.table-warning {
+    --bs-table-bg: var(--estado-aviso-fondo);
+    --bs-table-hover-bg: var(--estado-aviso-fondo);
+    --bs-table-hover-color: var(--bs-body-color);
+}
+
+.table-success {
+    --bs-table-bg: var(--estado-exito-fondo);
+    --bs-table-hover-bg: var(--estado-exito-fondo);
+    --bs-table-hover-color: var(--bs-body-color);
+}
+
+/*
+ * Tabla apilable: en PC y tablet horizontal es una tabla normal; por debajo de 1024 px cada fila
+ * pasa a tarjeta. El marcado no cambia (table, thead, th scope="col", caption y roles explícitos);
+ * la cabecera se oculta solo visualmente, así el lector de pantalla sigue anunciando las columnas.
+ * La etiqueta de cada celda sale de data-etiqueta, con texto alternativo vacío para no leerla dos veces.
+ */
+@media (max-width: 1023.98px) {
+    .table-responsive:has(> .tabla-apilable) {
+        overflow: visible;
+    }
+
+    .tabla-apilable,
+    .tabla-apilable tbody,
+    .tabla-apilable tr,
+    .tabla-apilable td {
+        display: block;
+    }
+
+    .tabla-apilable {
+        border: 0;
+        background: none !important;
+    }
+
+    .tabla-apilable thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+
+    .tabla-apilable tr {
+        margin-bottom: 0.75rem;
+        padding: 0.5rem 0.9rem;
+        border: 1px solid var(--bs-border-color);
+        border-radius: var(--bs-border-radius-lg);
+        background: var(--bs-table-bg);
+        box-shadow: var(--sombra-tarjeta);
+    }
+
+    .tabla-apilable td {
+        position: relative;
+        min-height: 1.75rem;
+        padding: 0.3rem 0 0.3rem 38%;
+        border: 0;
+        background: none;
+        box-shadow: none;
+        text-align: left !important;
+    }
+
+    .tabla-apilable td::before {
+        content: attr(data-etiqueta);
+        content: attr(data-etiqueta) / '';
+        position: absolute;
+        top: 0.3rem;
+        left: 0;
+        width: 34%;
+        color: var(--bs-secondary-color);
+        font-size: 0.8125rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+    }
+
+    /* La primera celda hace de título de la tarjeta y la de acciones va a la derecha, sin etiqueta. */
+    .tabla-apilable td[data-etiqueta=''] {
+        padding-left: 0;
+    }
+
+    .tabla-apilable td[data-etiqueta='']::before {
+        display: none;
+    }
+
+    .tabla-apilable td:first-child {
+        font-weight: 600;
+    }
+
+    .tabla-apilable td:last-child[data-etiqueta=''] {
+        text-align: right !important;
+    }
+}
+
+/* Filtros: la búsqueda siempre a la vista; el resto, tras el botón «Filtros» en pantallas estrechas. */
+@media (min-width: 768px) {
+    .filtros-extra.collapse,
+    .filtros-extra.collapsing {
+        display: contents !important;
+        height: auto !important;
+    }
+}
+
+/* Estado vacío con una acción. */
+.estado-vacio {
+    padding: 2rem 1rem;
+    border: 1px dashed var(--bs-border-color);
+    border-radius: var(--bs-border-radius-lg);
+    text-align: center;
+    color: var(--bs-secondary-color);
+}
+
+.estado-vacio .icono {
+    width: 2rem;
+    height: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Imagen de producto: miniatura de lista y ficha. Tamaño fijo, la imagen se contiene entera. */
+.miniatura {
+    display: inline-flex;
+    flex: none;
+    width: var(--lado, 48px);
+    height: var(--lado, 48px);
+    overflow: hidden;
+    border-radius: var(--bs-border-radius);
+    background: var(--bs-secondary-bg);
+}
+
+.miniatura img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.miniatura__marcador {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    color: var(--bs-secondary-color);
+    font-size: calc(var(--lado, 48px) * 0.42);
+    font-weight: 600;
+}
+
+.min-w-0 {
+    min-width: 0;
+}
+
+/* <summary> con aspecto de botón, sin el triángulo del navegador. */
+summary.btn {
+    list-style: none;
+}
+
+summary.btn::-webkit-details-marker {
+    display: none;
+}
+
+.ficha-imagen {
+    width: 100%;
+    max-width: 14rem;
+}
+
+.ficha-imagen__caja {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius-lg);
+    background: var(--bs-secondary-bg);
+}
+
+.ficha-imagen__caja img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.ficha-imagen__caja .miniatura__marcador {
+    font-size: 4rem;
+}
+
+@media (min-width: 576px) {
+    .ficha-imagen {
+        width: 11rem;
+        flex: none;
+    }
+}
+
+/* Formularios de movimiento: cantidad con − / +, motivo segmentado, cabecera de producto y líneas. */
+.stepper {
+    display: flex;
+    align-items: stretch;
+}
+
+.stepper .form-control {
+    min-width: 3.5rem;
+    border-radius: 0;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.stepper .form-control::-webkit-inner-spin-button,
+.stepper .form-control::-webkit-outer-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+}
+
+.stepper__boton {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    border: 1px solid var(--bs-border-color);
+    background: var(--bs-secondary-bg);
+    color: var(--bs-body-color);
+}
+
+.stepper__boton:first-child {
+    border-radius: var(--bs-border-radius) 0 0 var(--bs-border-radius);
+    margin-right: -1px;
+}
+
+.stepper__boton:last-child {
+    border-radius: 0 var(--bs-border-radius) var(--bs-border-radius) 0;
+    margin-left: -1px;
+}
+
+.stepper__boton:hover {
+    background: var(--bs-tertiary-bg);
+}
+
+.stepper__boton:active {
+    background: rgba(var(--marca-rgb), 0.16);
+}
+
+.stepper--grande .stepper__boton {
+    width: 3.25rem;
+}
+
+@media (pointer: coarse) {
+    .stepper__boton {
+        width: 3rem;
+        min-height: 44px;
+    }
+}
+
+.segmentado {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.segmentado .btn {
+    flex: 1 1 auto;
+}
+
+/* El motivo elegido lleva una marca además del color. */
+.segmentado .btn-check:checked + .btn::before {
+    content: '✓';
+    content: '✓' / '';
+    margin-right: 0.4rem;
+}
+
+.cabecera-producto {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+}
+
+.linea-movimiento {
+    border-left: 3px solid var(--marca);
+}
+
+.resultado-producto {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 0.75rem 1rem;
+}
+
+.campo-busqueda {
+    position: relative;
+}
+
+.campo-busqueda .icono {
+    position: absolute;
+    top: 50%;
+    left: 0.9rem;
+    transform: translateY(-50%);
+    color: var(--bs-secondary-color);
+    pointer-events: none;
+}
+
+.campo-busqueda .form-control {
+    padding-left: 2.75rem;
+}
+
+/* Inicio de sesión. */
+.login-pagina {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 75vh;
+}
+
+.login-tarjeta {
+    width: 100%;
+    max-width: 26rem;
+}
+
+.login-marca {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: var(--bs-border-radius-lg);
+    background: var(--marca);
+    color: #fff;
+}
+
+.login-marca .icono {
+    width: 1.75rem;
+    height: 1.75rem;
+}
+
+/* «Requiere atención» del Inicio. */
+.fila-atencion {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    min-height: 3.5rem;
+    padding: 0.75rem 1rem;
+}
+
+.fila-atencion__icono {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+}
+
+.fila-atencion--peligro { background: var(--estado-peligro-fondo); color: var(--estado-peligro-texto); }
+.fila-atencion--aviso { background: var(--estado-aviso-fondo); color: var(--estado-aviso-texto); }
+.fila-atencion--exito { background: var(--estado-exito-fondo); color: var(--estado-exito-texto); }
+
+.fila-atencion__texto {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.fila-atencion__cifra {
+    font-size: 1.35rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.indicador:hover {
+    border-color: var(--marca);
+}
+
+/* El contorno secundario conserva contraste en ambos temas. */
+.btn-outline-secondary {
+    --bs-btn-color: var(--bs-body-color);
+    --bs-btn-border-color: var(--bs-border-color);
+    --bs-btn-hover-color: var(--bs-body-color);
+    --bs-btn-hover-bg: var(--bs-secondary-bg);
+    --bs-btn-hover-border-color: var(--bs-secondary-color);
+    --bs-btn-active-color: var(--bs-body-color);
+    --bs-btn-active-bg: var(--bs-secondary-bg);
+    --bs-btn-active-border-color: var(--bs-secondary-color);
+    --bs-btn-disabled-color: var(--bs-secondary-color);
+    --bs-btn-disabled-border-color: var(--bs-border-color);
+}
+
+/* Accesos grandes del Inicio. */
+.acceso-grande {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    min-height: 5.5rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+}
+
+.acceso-grande small {
+    font-weight: 400;
+}
+
 /* Pantallas táctiles (tablet de la bodega): objetivos de al menos 44 px. */
 @media (pointer: coarse) {
     .btn,
     .form-control,
     .form-select,
     .list-group-item-action,
+    .enlace-menu,
     .nav-link {
         min-height: 44px;
     }

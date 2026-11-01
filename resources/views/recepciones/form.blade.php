@@ -3,13 +3,10 @@
 @section('titulo', 'Nueva recepción')
 
 @section('contenido')
-    <div class="mb-3">
-        <h1 class="h3 mb-1">Nueva recepción</h1>
-        <div class="text-body-secondary">
-            <strong>{{ $producto->nombre }}</strong> · {{ $producto->marca ?: 'Sin marca' }}
-            · <a href="{{ route('recepciones.create') }}">Cambiar producto</a>
-        </div>
-    </div>
+    <x-cabecera-producto :producto="$producto" titulo="Nueva recepción">
+        <strong>{{ $producto->nombre }}</strong> · {{ $producto->marca ?: 'Sin marca' }}
+        · <a href="{{ route('recepciones.create') }}">Cambiar producto</a>
+    </x-cabecera-producto>
 
     @if ($errors->has('token'))
         <div class="alert alert-danger">{{ $errors->first('token') }}</div>
@@ -33,16 +30,8 @@
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
             </div>
-            <div class="col-12 col-md-4">
-                <label for="motivo" class="form-label">Motivo</label>
-                <select id="motivo" name="motivo" class="form-select @error('motivo') is-invalid @enderror">
-                    @foreach ($motivos as $motivo)
-                        <option value="{{ $motivo->value }}" @selected(old('motivo', 'compra') === $motivo->value)>{{ $motivo->etiqueta() }}</option>
-                    @endforeach
-                </select>
-                @error('motivo')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
+            <div class="col-12 col-md-8">
+                @include('compartido.motivo', ['motivos' => $motivos, 'seleccionado' => old('motivo', 'compra')])
             </div>
         </div>
 
@@ -67,7 +56,7 @@
             @enderror
         </div>
 
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 barra-acciones">
             <button type="submit" class="btn btn-primary btn-lg" id="guardar">Registrar recepción</button>
             <a href="{{ route('recepciones.create') }}" class="btn btn-outline-secondary btn-lg">Cancelar</a>
         </div>

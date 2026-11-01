@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\CatalogoService;
 use App\Services\ConfiguracionService;
 use App\Services\RespaldoService;
 use Illuminate\Http\RedirectResponse;
@@ -14,13 +15,15 @@ use Illuminate\View\View;
  */
 class ConfiguracionController extends Controller
 {
-    public function edit(ConfiguracionService $configuracion, RespaldoService $respaldo): View
+    public function edit(ConfiguracionService $configuracion, RespaldoService $respaldo, CatalogoService $catalogo): View
     {
         return view('configuracion.edit', [
             'diasAlerta' => $configuracion->diasAlertaCaducidad(),
             'minimo' => ConfiguracionService::DIAS_ALERTA_MINIMO,
             'maximo' => ConfiguracionService::DIAS_ALERTA_MAXIMO,
             'respaldo' => $respaldo->estado(),
+            // Lo que ve el proceso web (Apache), no la consola.
+            'imagenes' => $catalogo->estadoImagenes(),
         ]);
     }
 

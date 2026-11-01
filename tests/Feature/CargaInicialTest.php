@@ -11,10 +11,11 @@ use App\Models\User;
 use App\Services\CargaInicialService;
 use App\Services\CatalogoService;
 use App\Services\ExistenciasService;
+use App\Services\InventarioService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 /**
@@ -57,7 +58,7 @@ class CargaInicialTest extends TestCase
 
     public function test_lee_el_archivo_y_normaliza_fechas_y_costos(): void
     {
-        $lectura = (new CargaInicialService(new \App\Services\InventarioService))->leer($this->csv(
+        $lectura = (new CargaInicialService(new InventarioService))->leer($this->csv(
             'aceite de girasol 1 l;Caja x12;5;L1;31/01/2027;"28,50"',
             'Arroz 1 kg;Unidad;40;;;',
             '',
@@ -72,7 +73,7 @@ class CargaInicialTest extends TestCase
 
     public function test_informa_todos_los_errores_con_su_numero_de_fila(): void
     {
-        $lectura = (new CargaInicialService(new \App\Services\InventarioService))->leer($this->csv(
+        $lectura = (new CargaInicialService(new InventarioService))->leer($this->csv(
             'Producto inexistente;Unidad;1;;;',
             'Arroz 1 kg;Sobre;1;;;',
             'Arroz 1 kg;Unidad;0;;;',
@@ -87,7 +88,7 @@ class CargaInicialTest extends TestCase
 
     public function test_falta_una_columna_obligatoria(): void
     {
-        $lectura = (new CargaInicialService(new \App\Services\InventarioService))->leer("producto;cantidad\nArroz 1 kg;3");
+        $lectura = (new CargaInicialService(new InventarioService))->leer("producto;cantidad\nArroz 1 kg;3");
 
         $this->assertStringContainsString('presentacion', $lectura['errores'][0]);
     }
@@ -130,7 +131,7 @@ class CargaInicialTest extends TestCase
 
     public function test_reenviar_la_misma_carga_no_duplica_existencias(): void
     {
-        $servicio = new CargaInicialService(new \App\Services\InventarioService);
+        $servicio = new CargaInicialService(new InventarioService);
         $filas = $servicio->leer($this->csv('Arroz 1 kg;Unidad;40;;;'))['filas'];
         $token = (string) Str::uuid();
 
@@ -149,8 +150,8 @@ class CargaInicialTest extends TestCase
         $this->actingAs($encargado)->get(route('carga-inicial.plantilla'))->assertForbidden();
         $this->actingAs($encargado)->post(route('carga-inicial.store'))->assertForbidden();
 
-        $this->expectException(\Illuminate\Auth\Access\AuthorizationException::class);
-        (new CargaInicialService(new \App\Services\InventarioService))->registrar($encargado, (string) Str::uuid(), [], now());
+        $this->expectException(AuthorizationException::class);
+        (new CargaInicialService(new InventarioService))->registrar($encargado, (string) Str::uuid(), [], now());
     }
 
     public function test_la_plantilla_lista_cada_presentacion_activa(): void

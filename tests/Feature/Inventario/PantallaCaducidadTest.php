@@ -52,18 +52,23 @@ class PantallaCaducidadTest extends TestCase
         $this->actingAs($this->usuario)->get(route('caducidad.index'))
             ->assertSee(route('salidas.create', ['producto' => $this->aceite->id, 'motivo' => 'vencido']));
 
-        $this->actingAs($this->usuario)->get(route('salidas.create', ['producto' => $this->aceite->id, 'motivo' => 'vencido']))
-            ->assertSee('<option value="vencido" selected', false);
+        // El motivo es un grupo de botones (radios con name="motivo"): el elegido va marcado.
+        $elegido = fn (string $html, string $valor) => preg_match('/<input type="radio"[^>]*name="motivo"[^>]*value="'.$valor.'"[^>]*\schecked/', $html) === 1;
+
+        $html = $this->actingAs($this->usuario)->get(route('salidas.create', ['producto' => $this->aceite->id, 'motivo' => 'vencido']))->getContent();
+        $this->assertTrue($elegido($html, 'vencido'));
+        $this->assertFalse($elegido($html, 'venta_entrega'));
 
         // Un motivo que no es de salida se ignora.
-        $this->actingAs($this->usuario)->get(route('salidas.create', ['producto' => $this->aceite->id, 'motivo' => 'compra']))
-            ->assertSee('<option value="venta_entrega" selected', false);
+        $html = $this->actingAs($this->usuario)->get(route('salidas.create', ['producto' => $this->aceite->id, 'motivo' => 'compra']))->getContent();
+        $this->assertTrue($elegido($html, 'venta_entrega'));
+        $this->assertFalse($elegido($html, 'vencido'));
     }
 
     public function test_el_menu_muestra_el_contador_de_alertas(): void
     {
         $this->actingAs($this->usuario)->get(route('inventario.index'))
-            ->assertSee('title="Lotes vencidos o próximos a caducar">2</span>', false);
+            ->assertSee('title="Lotes vencidos o próximos a caducar">2<span class="visually-hidden"> lotes en alerta</span></span>', false);
     }
 
     public function test_la_ficha_de_inventario_muestra_el_estado_y_los_dias(): void

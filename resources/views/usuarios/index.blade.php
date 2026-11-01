@@ -9,40 +9,41 @@
     </div>
 
     <div class="table-responsive">
-        <table class="table align-middle bg-white">
-            <thead>
-                <tr>
-                    <th>Nombre</th>
-                    <th>Rol y permisos</th>
-                    <th>Estado</th>
-                    <th></th>
+        <table class="table align-middle bg-body tabla-apilable" role="table">
+                <caption class="visually-hidden">Usuarios</caption>
+            <thead role="rowgroup">
+                <tr role="row">
+                    <th scope="col" role="columnheader">Nombre</th>
+                    <th scope="col" role="columnheader">Rol y permisos</th>
+                    <th scope="col" role="columnheader">Estado</th>
+                    <th scope="col" role="columnheader"><span class="visually-hidden">Acciones</span></th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody role="rowgroup">
                 @foreach ($usuarios as $usuario)
-                    <tr>
-                        <td>
+                    <tr role="row">
+                        <td role="cell" data-etiqueta="">
                             {{ $usuario->name }}
                             <div class="small text-body-secondary">{{ $usuario->email }}</div>
                         </td>
-                        <td>
+                        <td role="cell" data-etiqueta="Rol y permisos">
                             <span class="badge text-bg-primary">{{ $usuario->rol->etiqueta() }}</span>
                             @if ($usuario->esAdmin())
                                 <span class="small text-body-secondary">todos los permisos</span>
                             @else
-                                @if ($usuario->puede_gestionar_catalogo) <span class="badge text-bg-light border">Catálogo</span> @endif
-                                @if ($usuario->puede_ajustar_inventario) <span class="badge text-bg-light border">Ajustes</span> @endif
-                                @if ($usuario->puede_revertir) <span class="badge text-bg-light border">Reversiones</span> @endif
+                                @if ($usuario->puede_gestionar_catalogo) <span class="badge bg-body-secondary text-body border">Catálogo</span> @endif
+                                @if ($usuario->puede_ajustar_inventario) <span class="badge bg-body-secondary text-body border">Ajustes</span> @endif
+                                @if ($usuario->puede_revertir) <span class="badge bg-body-secondary text-body border">Reversiones</span> @endif
                             @endif
                         </td>
-                        <td>
+                        <td role="cell" data-etiqueta="Estado">
                             @if ($usuario->activo)
-                                <span class="badge text-bg-success">Activo</span>
+                                @include('compartido.estado', ['tipo' => 'activo'])
                             @else
-                                <span class="badge text-bg-secondary">Inactivo</span>
+                                @include('compartido.estado', ['tipo' => 'inactivo'])
                             @endif
                         </td>
-                        <td class="text-end">
+                        <td role="cell" data-etiqueta="" class="text-end">
                             <a href="{{ route('usuarios.edit', $usuario) }}" class="btn btn-outline-secondary btn-sm">Editar</a>
                         </td>
                     </tr>

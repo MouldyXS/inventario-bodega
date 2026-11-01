@@ -3,14 +3,12 @@
 @section('titulo', 'Existencias de '.$producto->nombre)
 
 @section('contenido')
-    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
-        <div>
-            <h1 class="h3 mb-1">{{ $producto->nombre }}</h1>
-            <div class="text-body-secondary">
-                {{ $producto->marca ?: 'Sin marca' }} · {{ $producto->categoria->nombre }}
-                · <a href="{{ route('productos.show', $producto) }}">Ficha del producto</a>
-            </div>
-        </div>
+    <x-cabecera-producto :producto="$producto" :titulo="$producto->nombre">
+        {{ $producto->marca ?: 'Sin marca' }} · {{ $producto->categoria->nombre }}
+        · <a href="{{ route('productos.show', $producto) }}">Ficha del producto</a>
+    </x-cabecera-producto>
+
+    <div class="d-flex flex-wrap gap-2 mb-4">
         <div class="d-flex flex-wrap gap-2">
             @if ($producto->activo)
                 <a href="{{ route('recepciones.create', ['producto' => $producto->id]) }}" class="btn btn-primary">Registrar recepción</a>
@@ -24,7 +22,7 @@
 
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-3">
-            <div class="card card-body">
+            <div class="card card-body indicador">
                 <div class="small text-body-secondary">Disponible</div>
                 <div class="fs-4 fw-semibold">{{ $existenciaDisponible }} <span class="fs-6 fw-normal">{{ $base?->nombre }}</span></div>
             </div>
@@ -48,48 +46,49 @@
         <p class="text-body-secondary">No hay lotes con existencias.</p>
     @else
         <div class="table-responsive">
-            <table class="table align-middle bg-white">
-                <thead>
-                    <tr>
-                        <th>Lote</th>
-                        <th>Caducidad</th>
-                        <th>Existencias por presentación</th>
-                        <th class="text-end">Total ({{ $base?->nombre }})</th>
-                        <th>Recepciones</th>
-                        <th></th>
+            <table class="table align-middle bg-body tabla-apilable" role="table">
+                <caption class="visually-hidden">Lotes del producto, con la caducidad más próxima primero</caption>
+                <thead role="rowgroup">
+                    <tr role="row">
+                        <th scope="col" role="columnheader">Lote</th>
+                        <th scope="col" role="columnheader">Caducidad</th>
+                        <th scope="col" role="columnheader">Existencias por presentación</th>
+                        <th scope="col" role="columnheader" class="text-end">Total ({{ $base?->nombre }})</th>
+                        <th scope="col" role="columnheader">Recepciones</th>
+                        <th scope="col" role="columnheader"><span class="visually-hidden">Acciones</span></th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody role="rowgroup">
                     @foreach ($lotes as $lote)
                         @php($estado = $existencias->estado($lote, $diasAlerta))
-                        <tr @class(['table-danger' => $estado === \App\Enums\EstadoCaducidad::Vencido, 'table-warning' => $estado === \App\Enums\EstadoCaducidad::Proximo])>
-                            <td>{{ $lote->etiqueta() }}</td>
-                            <td>
+                        <tr role="row" @class(['table-danger' => $estado === \App\Enums\EstadoCaducidad::Vencido, 'table-warning' => $estado === \App\Enums\EstadoCaducidad::Proximo])>
+                            <td role="cell" data-etiqueta="">{{ $lote->etiqueta() }}</td>
+                            <td role="cell" data-etiqueta="Caducidad">
                                 {{ $lote->fecha_caducidad?->format('d/m/Y') ?? 'Sin caducidad' }}
                                 @if ($estado !== null)
                                     <div class="small">
-                                        <span class="badge {{ $estado->claseInsignia() }}">{{ $estado->etiqueta() }}</span>
+                                        @include('compartido.estado', ['tipo' => $estado->value, 'texto' => $estado->etiqueta()])
                                         {{ \App\Enums\EstadoCaducidad::textoDias($existencias->diasRestantes($lote)) }}
                                     </div>
                                 @endif
                             </td>
-                            <td>
+                            <td role="cell" data-etiqueta="Existencias">
                                 @forelse ($porLote->get($lote->id, collect())->sortByDesc(fn ($f) => $presentaciones[$f->presentacion_id]->factor) as $fila)
-                                    <span class="badge text-bg-light border fs-6 fw-normal me-1">
+                                    <span class="badge bg-body-secondary text-body border fs-6 fw-normal me-1">
                                         {{ $fila->cantidad }} {{ $presentaciones[$fila->presentacion_id]->nombre }}
                                     </span>
                                 @empty
                                     <span class="text-body-secondary">Agotado</span>
                                 @endforelse
                             </td>
-                            <td class="text-end fw-semibold">{{ $lote->existencia_base }}</td>
-                            <td class="small text-body-secondary">
+                            <td role="cell" data-etiqueta="Total ({{ $base?->nombre }})" class="text-end fw-semibold">{{ $lote->existencia_base }}</td>
+                            <td role="cell" data-etiqueta="Recepciones" class="small text-body-secondary">
                                 {{ $lote->primera_recepcion?->format('d/m/Y') }}
                                 @if ($lote->ultima_recepcion && $lote->ultima_recepcion->ne($lote->primera_recepcion))
                                     – {{ $lote->ultima_recepcion->format('d/m/Y') }}
                                 @endif
                             </td>
-                            <td class="text-end text-nowrap">
+                            <td role="cell" data-etiqueta="" class="text-end text-nowrap">
                                 @if ($lote->existencia_base !== 0)
                                     <a href="{{ route('conversiones.create', $lote) }}" class="btn btn-outline-secondary btn-sm">Abrir / convertir</a>
                                 @endif

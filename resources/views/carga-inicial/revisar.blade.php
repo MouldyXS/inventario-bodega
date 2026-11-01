@@ -3,25 +3,25 @@
 @section('titulo', 'Revisar carga inicial')
 
 @section('contenido')
-    <h1 class="h3 mb-1">Revisar carga inicial</h1>
-    <p class="text-body-secondary">
+    <x-cabecera-pagina titulo="Revisar carga inicial">
         {{ count($filas) }} filas de {{ $productos }} productos. Todavía no se guardó nada.
-    </p>
+    </x-cabecera-pagina>
 
     <div class="table-responsive mb-3">
-        <table class="table table-sm align-middle">
-            <thead>
-                <tr><th>Producto</th><th>Presentación</th><th class="text-end">Cantidad</th><th>Lote</th><th>Caducidad</th><th class="text-end">Costo</th></tr>
+        <table class="table table-sm align-middle tabla-apilable" role="table">
+                <caption class="visually-hidden">Filas del archivo a cargar</caption>
+            <thead role="rowgroup">
+                <tr role="row"><th scope="col" role="columnheader">Producto</th><th scope="col" role="columnheader">Presentación</th><th scope="col" role="columnheader" class="text-end">Cantidad</th><th scope="col" role="columnheader">Lote</th><th scope="col" role="columnheader">Caducidad</th><th scope="col" role="columnheader" class="text-end">Costo</th></tr>
             </thead>
-            <tbody>
+            <tbody role="rowgroup">
                 @foreach ($filas as $fila)
-                    <tr>
-                        <td>{{ $fila['producto'] }}</td>
-                        <td>{{ $fila['presentacion'] }}</td>
-                        <td class="text-end">{{ $fila['cantidad'] }}</td>
-                        <td>{{ $fila['codigo_lote'] ?: '—' }}</td>
-                        <td>{{ $fila['fecha_caducidad'] ?? '—' }}</td>
-                        <td class="text-end">{{ $fila['costo_unitario'] ?? '—' }}</td>
+                    <tr role="row">
+                        <td role="cell" data-etiqueta="">{{ $fila['producto'] }}</td>
+                        <td role="cell" data-etiqueta="Presentación">{{ $fila['presentacion'] }}</td>
+                        <td role="cell" data-etiqueta="Cantidad" class="text-end">{{ $fila['cantidad'] }}</td>
+                        <td role="cell" data-etiqueta="Lote">{{ $fila['codigo_lote'] ?: '—' }}</td>
+                        <td role="cell" data-etiqueta="Caducidad">{{ $fila['fecha_caducidad'] ?? '—' }}</td>
+                        <td role="cell" data-etiqueta="Costo" class="text-end">{{ $fila['costo_unitario'] ?? '—' }}</td>
                     </tr>
                 @endforeach
             </tbody>
@@ -39,7 +39,7 @@
                 </div>
             </div>
         @endif
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 barra-acciones">
             <button type="submit" class="btn btn-primary btn-lg" id="guardar">Confirmar y registrar</button>
             <a href="{{ route('carga-inicial.create') }}" class="btn btn-outline-secondary btn-lg">Cancelar</a>
         </div>

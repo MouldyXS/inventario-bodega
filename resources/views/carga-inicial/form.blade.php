@@ -3,10 +3,9 @@
 @section('titulo', 'Carga inicial')
 
 @section('contenido')
-    <h1 class="h3 mb-1">Carga inicial de existencias</h1>
-    <p class="text-body-secondary">
+    <x-cabecera-pagina titulo="Carga inicial de existencias">
         Registra las existencias contadas como entradas con motivo «Carga inicial». Los productos y las presentaciones deben existir en el catálogo.
-    </p>
+    </x-cabecera-pagina>
 
     @if ($previas > 0)
         <div class="alert alert-warning">Ya hay {{ $previas }} movimientos de carga inicial. Cargar de nuevo sumará existencias; hazlo solo si es lo que quieres.</div>

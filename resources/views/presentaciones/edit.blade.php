@@ -3,13 +3,15 @@
 @section('titulo', 'Editar presentación')
 
 @section('contenido')
-    <h1 class="h3 mb-1">Editar presentación</h1>
-    <p class="text-body-secondary">{{ $presentacion->producto->nombre }}</p>
+    <x-cabecera-producto :producto="$presentacion->producto" titulo="Editar presentación">
+        {{ $presentacion->producto->nombre }}
+    </x-cabecera-producto>
 
-    <form method="POST" action="{{ route('presentaciones.update', $presentacion) }}" class="card card-body" style="max-width: 40rem">
+    <form method="POST" action="{{ route('presentaciones.update', $presentacion) }}" style="max-width: 40rem">
         @csrf
         @method('PUT')
 
+        <div class="card card-body mb-3">
         <div class="mb-3">
             <label for="nombre" class="form-label">Nombre</label>
             <input type="text" id="nombre" name="nombre" value="{{ old('nombre', $presentacion->nombre) }}" maxlength="50"
@@ -44,7 +46,9 @@
             <div class="alert alert-danger">{{ $message }}</div>
         @enderror
 
-        <div class="d-flex gap-2">
+        </div>
+
+        <div class="d-flex gap-2 barra-acciones">
             <button type="submit" class="btn btn-primary">Guardar</button>
             <a href="{{ route('productos.show', $presentacion->producto_id) }}" class="btn btn-outline-secondary">Cancelar</a>
         </div>

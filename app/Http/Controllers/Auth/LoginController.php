@@ -65,6 +65,8 @@ class LoginController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('login');
+        // Borra la caché HTTP del navegador (imágenes, CSS y JS) para que otra
+        // persona en la misma tablet no vea nada guardado; no toca cookies ni localStorage.
+        return redirect()->route('login')->header('Clear-Site-Data', '"cache"');
     }
 }

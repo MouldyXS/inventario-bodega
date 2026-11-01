@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\CatalogoService;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -46,6 +47,19 @@ class VerificarPermisos extends Command
         $forUpdateMovimientos = $this->denegada('SELECT id FROM movimientos WHERE 1 = 0 FOR UPDATE', bloqueo: true);
         $this->line('Información: SELECT … FOR UPDATE sobre movimientos (solo SELECT e INSERT) '
             .($forUpdateMovimientos ? 'se deniega.' : 'se permite.'));
+
+        // Imágenes de productos: informativo, no cambia el resultado (lo que ve la consola;
+        // lo que ve Apache se muestra en Configuración).
+        $imagenes = app(CatalogoService::class)->estadoImagenes();
+        $this->line(sprintf(
+            'Imágenes: GD %s, WebP %s, EXIF %s, subida %s MB, formulario %s MB, memoria %s.',
+            $imagenes['gd'] ? 'sí' : 'NO', $imagenes['webp'] ? 'sí' : 'NO', $imagenes['exif'] ? 'sí' : 'NO',
+            $imagenes['subida_mb'], $imagenes['post_mb'], $imagenes['memoria'],
+        ));
+
+        if (! $imagenes['webp'] || ! $imagenes['subida_suficiente']) {
+            $this->warn('Aviso: la subida de imágenes no está lista (docs/OPERACION.md, «Imágenes de productos»).');
+        }
 
         if (in_array(false, array_column($comprobaciones, 1), true)) {
             $this->error('La cuenta no cumple §6.5. Revisa database/sql/02_permisos_app.sql.');

@@ -25,6 +25,7 @@ class PanelTest extends TestCase
     {
         $this->actingAs($this->usuario)->get(route('inicio'))
             ->assertOk()
+            ->assertSee('Todo en orden')
             ->assertSee('No hay lotes vencidos con existencias.')
             ->assertSee('No hay lotes próximos a caducar.')
             ->assertSee('Ningún producto está por debajo de su mínimo.')
@@ -42,7 +43,9 @@ class PanelTest extends TestCase
         $this->actingAs($this->usuario)->get(route('inicio'))
             ->assertOk()
             ->assertSeeInOrder(['Productos registrados', '1', 'Productos con existencia', '1', 'Lotes activos', '3'])
-            ->assertSeeInOrder(['Próximos a caducar', '1', 'Lotes vencidos', '1', 'Bajo el mínimo', '1'])
+            ->assertSee('Requiere atención')
+            ->assertDontSee('Todo en orden')
+            ->assertSeeInOrder(['Requiere atención', 'Lotes vencidos', '1', 'Próximos a caducar', '1', 'Bajo el mínimo', '1', 'Productos registrados'])
             ->assertSeeInOrder(['Lotes vencidos', 'VIEJO', 'Venció hace 10 días', 'Próximos a caducar', 'PRONTO', 'Faltan 11 días'])
             // Disponible 36 (sin las 4 vencidas) de un mínimo de 50.
             ->assertSeeInOrder(['Bajo el mínimo', $this->aceite->nombre, '36', 'de 50 Botella'])

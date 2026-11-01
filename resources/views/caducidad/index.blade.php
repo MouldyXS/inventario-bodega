@@ -21,11 +21,20 @@
         @endcan
     </p>
 
+    @php
+        $filtrosActivos = $filtro !== 'alertas' || $categoriaId;
+        $hayFiltros = $busqueda !== '' || $filtrosActivos;
+    @endphp
     <form method="GET" action="{{ route('caducidad.index') }}" class="row g-2 mb-3">
         <div class="col-12 col-lg-4">
             <label for="q" class="visually-hidden">Producto</label>
             <input type="search" id="q" name="q" value="{{ $busqueda }}" class="form-control" placeholder="Producto, marca o código">
         </div>
+        <div class="col-12 d-md-none">
+            <button type="button" class="btn btn-outline-secondary w-100" data-bs-toggle="collapse" data-bs-target="#filtros-extra"
+                    aria-expanded="{{ $filtrosActivos ? 'true' : 'false' }}" aria-controls="filtros-extra">Filtros</button>
+        </div>
+        <div class="filtros-extra row g-2 collapse @if ($filtrosActivos) show @endif" id="filtros-extra">
         <div class="col-6 col-lg-3">
             <label for="estado" class="visually-hidden">Estado</label>
             <select id="estado" name="estado" class="form-select">
@@ -45,45 +54,52 @@
                 @endforeach
             </select>
         </div>
+        </div>
         <div class="col-12 col-lg-2 d-grid">
             <button type="submit" class="btn btn-outline-primary">Filtrar</button>
         </div>
     </form>
 
     @if ($lotes->isEmpty())
-        <p class="text-body-secondary">No hay lotes con existencias en este estado.</p>
+        @include('compartido.vacio', ['mensaje' => 'No hay lotes con existencias en este estado.', 'quitar' => $hayFiltros ? route('caducidad.index') : null])
     @else
         <div class="table-responsive">
-            <table class="table align-middle bg-white">
-                <thead>
-                    <tr>
-                        <th>Producto</th>
-                        <th>Lote</th>
-                        <th>Caducidad</th>
-                        <th>Existencias</th>
-                        <th></th>
+            <table class="table align-middle bg-body tabla-apilable" role="table">
+                <caption class="visually-hidden">Lotes con existencias por caducidad</caption>
+                <thead role="rowgroup">
+                    <tr role="row">
+                        <th scope="col" role="columnheader">Producto</th>
+                        <th scope="col" role="columnheader">Lote</th>
+                        <th scope="col" role="columnheader">Caducidad</th>
+                        <th scope="col" role="columnheader">Existencias</th>
+                        <th scope="col" role="columnheader"><span class="visually-hidden">Acciones</span></th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody role="rowgroup">
                     @foreach ($lotes as $lote)
                         @php($estado = $existencias->estado($lote, $diasAlerta))
-                        <tr @class(['table-danger' => $estado === \App\Enums\EstadoCaducidad::Vencido, 'table-warning' => $estado === \App\Enums\EstadoCaducidad::Proximo])>
-                            <td><a href="{{ route('inventario.show', $lote->producto_id) }}">{{ $lote->producto->nombre }}</a></td>
-                            <td>{{ $lote->etiqueta() }}</td>
-                            <td>
+                        <tr role="row" @class(['table-danger' => $estado === \App\Enums\EstadoCaducidad::Vencido, 'table-warning' => $estado === \App\Enums\EstadoCaducidad::Proximo])>
+                            <td role="cell" data-etiqueta="">
+                                <div class="d-flex align-items-center gap-3">
+                                    @include('compartido.miniatura', ['producto' => $lote->producto, 'lado' => 44])
+                                    <a href="{{ route('inventario.show', $lote->producto_id) }}">{{ $lote->producto->nombre }}</a>
+                                </div>
+                            </td>
+                            <td role="cell" data-etiqueta="Lote">{{ $lote->etiqueta() }}</td>
+                            <td role="cell" data-etiqueta="Caducidad">
                                 {{ $lote->fecha_caducidad->format('d/m/Y') }}
                                 <div class="small">
-                                    <span class="badge {{ $estado->claseInsignia() }}">{{ $estado->etiqueta() }}</span>
+                                    @include('compartido.estado', ['tipo' => $estado->value, 'texto' => $estado->etiqueta()])
                                     {{ \App\Enums\EstadoCaducidad::textoDias($lote->dias_restantes) }}
                                 </div>
                             </td>
-                            <td>
+                            <td role="cell" data-etiqueta="Existencias">
                                 @foreach ($porLote->get($lote->id, collect()) as $fila)
-                                    <span class="badge text-bg-light border fs-6 fw-normal me-1">{{ $fila->cantidad }} {{ $presentaciones[$fila->presentacion_id]->nombre }}</span>
+                                    <span class="badge bg-body-secondary text-body border fs-6 fw-normal me-1">{{ $fila->cantidad }} {{ $presentaciones[$fila->presentacion_id]->nombre }}</span>
                                 @endforeach
                                 <div class="small text-body-secondary">Total: {{ $lote->existencia_base }} {{ $presentaciones->first(fn ($p) => $p->producto_id === $lote->producto_id && $p->es_base)?->nombre }}</div>
                             </td>
-                            <td class="text-end">
+                            <td role="cell" data-etiqueta="" class="text-end">
                                 <a href="{{ route('salidas.create', ['producto' => $lote->producto_id, 'motivo' => $estado === \App\Enums\EstadoCaducidad::Vencido ? 'vencido' : null]) }}"
                                    class="btn btn-outline-secondary btn-sm text-nowrap">Registrar salida</a>
                             </td>

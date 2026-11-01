@@ -16,6 +16,7 @@ use App\Http\Controllers\MovimientoController;
 use App\Http\Controllers\PanelController;
 use App\Http\Controllers\PresentacionController;
 use App\Http\Controllers\ProductoController;
+use App\Http\Controllers\ProductoImagenController;
 use App\Http\Controllers\RecepcionController;
 use App\Http\Controllers\ReversionController;
 use App\Http\Controllers\SalidaController;
@@ -70,6 +71,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/carga-inicial/revisar', [CargaInicialController::class, 'revisar'])->name('carga-inicial.revisar');
         Route::post('/carga-inicial', [CargaInicialController::class, 'store'])->name('carga-inicial.store');
 
+        // Imagen principal del producto: cargar, sustituir y quitar solo el administrador.
+        Route::put('/productos/{producto}/imagen', [ProductoImagenController::class, 'update'])->name('productos.imagen.update');
+        Route::delete('/productos/{producto}/imagen', [ProductoImagenController::class, 'destroy'])->name('productos.imagen.destroy');
+
         Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
         Route::get('/usuarios/crear', [UsuarioController::class, 'create'])->name('usuarios.create');
         Route::post('/usuarios', [UsuarioController::class, 'store'])->name('usuarios.store');
@@ -98,4 +103,6 @@ Route::middleware('auth')->group(function () {
     Route::get('/categorias', [CategoriaController::class, 'index'])->name('categorias.index');
     Route::get('/productos', [ProductoController::class, 'index'])->name('productos.index');
     Route::get('/productos/{producto}', [ProductoController::class, 'show'])->name('productos.show');
+    Route::get('/productos/{producto}/imagen/{version}/{tamano}', [ProductoImagenController::class, 'show'])
+        ->where('version', '[0-9a-z]{1,80}')->whereIn('tamano', ['m', 't'])->name('productos.imagen');
 });

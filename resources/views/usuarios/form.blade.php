@@ -3,15 +3,16 @@
 @section('titulo', $usuario->exists ? 'Editar usuario' : 'Nuevo usuario')
 
 @section('contenido')
-    <h1 class="h3 mb-3">{{ $usuario->exists ? 'Editar usuario' : 'Nuevo usuario' }}</h1>
+    <x-cabecera-pagina :titulo="$usuario->exists ? 'Editar usuario' : 'Nuevo usuario'" />
 
     <form method="POST" action="{{ $usuario->exists ? route('usuarios.update', $usuario) : route('usuarios.store') }}"
-          class="card card-body" style="max-width: 40rem" id="form-usuario">
+          style="max-width: 40rem" id="form-usuario">
         @csrf
         @if ($usuario->exists)
             @method('PUT')
         @endif
 
+        <div class="card card-body mb-3">
         <div class="mb-3">
             <label for="name" class="form-label">Nombre</label>
             <input type="text" id="name" name="name" maxlength="100" value="{{ old('name', $usuario->name) }}"
@@ -37,12 +38,8 @@
                     <span class="text-body-secondary">(déjala vacía para no cambiarla; si la cambias, se cierran sus sesiones)</span>
                 @endif
             </label>
-            <input type="password" id="password" name="password" minlength="8" maxlength="100" autocomplete="new-password"
-                   class="form-control @error('password') is-invalid @enderror" @required(! $usuario->exists)>
-            <div class="form-text">Mínimo 8 caracteres. El usuario puede cambiarla desde su nombre, arriba a la derecha.</div>
-            @error('password')
-                <div class="invalid-feedback">{{ $message }}</div>
-            @enderror
+            @include('compartido.campo-clave', ['id' => 'password', 'name' => 'password', 'autocomplete' => 'new-password', 'minlength' => 8, 'maxlength' => 100, 'requerido' => ! $usuario->exists])
+            <div class="form-text">Mínimo 8 caracteres. El usuario puede cambiarla desde su nombre, en el menú.</div>
         </div>
 
         <div class="mb-3">
@@ -79,7 +76,9 @@
             </div>
         @endif
 
-        <div class="d-flex gap-2">
+        </div>
+
+        <div class="d-flex gap-2 barra-acciones">
             <button type="submit" class="btn btn-primary">Guardar</button>
             <a href="{{ route('usuarios.index') }}" class="btn btn-outline-secondary">Cancelar</a>
         </div>

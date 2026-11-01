@@ -3,13 +3,12 @@
 @section('titulo', 'Ajuste por conteo')
 
 @section('contenido')
-    <h1 class="h3 mb-1">Ajuste por conteo</h1>
-    <p class="text-body-secondary">
+    <x-cabecera-producto :producto="$producto" titulo="Ajuste por conteo">
         {{ $producto->nombre }} · {{ $producto->marca ?: 'Sin marca' }}
         · <a href="{{ route('ajustes.create', ['producto' => $producto->id, 'agotados' => $incluirAgotados ? null : 1]) }}">
             {{ $incluirAgotados ? 'Ocultar lotes agotados' : 'Mostrar lotes agotados' }}
         </a>
-    </p>
+    </x-cabecera-producto>
     <p class="small text-body-secondary">
         Escribe la cantidad contada solo en las filas que revisaste. El sistema registra la diferencia con lo que
         tiene anotado en el momento de guardar. La mercancía encontrada sin lote se registra como recepción.
@@ -29,33 +28,32 @@
             <input type="hidden" name="token" value="{{ $token }}">
 
             <div class="table-responsive mb-3">
-                <table class="table align-middle bg-white">
-                    <thead>
-                        <tr>
-                            <th>Lote</th>
-                            <th>Presentación</th>
-                            <th class="text-end">Registrado</th>
-                            <th style="width: 10rem">Contado</th>
+                <table class="table align-middle bg-body tabla-apilable" role="table">
+                    <caption class="visually-hidden">Lotes y presentaciones a contar</caption>
+                    <thead role="rowgroup">
+                        <tr role="row">
+                            <th scope="col" role="columnheader">Lote</th>
+                            <th scope="col" role="columnheader">Presentación</th>
+                            <th scope="col" role="columnheader" class="text-end">Registrado</th>
+                            <th scope="col" role="columnheader" style="width: 12rem">Contado</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody role="rowgroup">
                         @php($fila = 0)
                         @foreach ($lotes as $lote)
                             @php($existentes = $porLote->get($lote->id, collect())->pluck('cantidad', 'presentacion_id'))
                             @foreach ($presentaciones->filter(fn ($p) => $p->activo || ($existentes[$p->id] ?? 0) !== 0) as $presentacion)
-                                <tr>
-                                    <td>
+                                <tr role="row">
+                                    <td role="cell" data-etiqueta="">
                                         {{ $lote->etiqueta() }}
                                         <div class="small text-body-secondary">{{ $lote->fecha_caducidad?->format('d/m/Y') ?? 'Sin caducidad' }}</div>
                                     </td>
-                                    <td>{{ $presentacion->nombre }}</td>
-                                    <td class="text-end">{{ $existentes[$presentacion->id] ?? 0 }}</td>
-                                    <td>
+                                    <td role="cell" data-etiqueta="Presentación">{{ $presentacion->nombre }}</td>
+                                    <td role="cell" data-etiqueta="Registrado" class="text-end">{{ $existentes[$presentacion->id] ?? 0 }}</td>
+                                    <td role="cell" data-etiqueta="Contado">
                                         <input type="hidden" name="conteos[{{ $fila }}][lote_id]" value="{{ $lote->id }}">
                                         <input type="hidden" name="conteos[{{ $fila }}][presentacion_id]" value="{{ $presentacion->id }}">
-                                        <input type="number" name="conteos[{{ $fila }}][contado]" min="0" step="1" inputmode="numeric"
-                                               aria-label="Contado de {{ $presentacion->nombre }} en el lote {{ $lote->etiqueta() }}"
-                                               value="{{ old("conteos.$fila.contado") }}" class="form-control">
+                                        @include('compartido.cantidad', ['id' => "contado-{$fila}", 'name' => "conteos[{$fila}][contado]", 'min' => 0, 'valor' => old("conteos.$fila.contado"), 'etiqueta' => "Contado de {$presentacion->nombre} en el lote {$lote->etiqueta()}"])
                                     </td>
                                 </tr>
                                 @php($fila++)
@@ -66,16 +64,8 @@
             </div>
 
             <div class="row g-3 mb-3" style="max-width: 48rem">
-                <div class="col-12 col-md-6">
-                    <label for="motivo" class="form-label">Motivo</label>
-                    <select id="motivo" name="motivo" class="form-select @error('motivo') is-invalid @enderror">
-                        @foreach ($motivos as $motivo)
-                            <option value="{{ $motivo->value }}" @selected(old('motivo', 'conteo_fisico') === $motivo->value)>{{ $motivo->etiqueta() }}</option>
-                        @endforeach
-                    </select>
-                    @error('motivo')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
+                <div class="col-12">
+                    @include('compartido.motivo', ['motivos' => $motivos, 'seleccionado' => old('motivo', 'conteo_fisico')])
                 </div>
                 <div class="col-12 col-md-6">
                     <label for="fecha" class="form-label">Fecha y hora del conteo</label>
@@ -102,7 +92,7 @@
                 @endif
             @endforeach
 
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 barra-acciones">
                 <button type="submit" class="btn btn-primary btn-lg" id="guardar">Registrar ajuste</button>
                 <a href="{{ route('inventario.show', $producto) }}" class="btn btn-outline-secondary btn-lg">Cancelar</a>
             </div>

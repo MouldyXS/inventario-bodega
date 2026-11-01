@@ -3,7 +3,14 @@
 @section('titulo', $producto->exists ? 'Editar producto' : 'Nuevo producto')
 
 @section('contenido')
-    <h1 class="h3 mb-3">{{ $producto->exists ? 'Editar producto' : 'Nuevo producto' }}</h1>
+    <div class="mb-3">
+        <h1 class="h3 mb-0">{{ $producto->exists ? 'Editar producto' : 'Nuevo producto' }}</h1>
+        @if ($producto->exists)
+            <div class="text-body-secondary">{{ $producto->nombre }}</div>
+        @else
+            <div class="text-body-secondary">La imagen se añade después, desde la ficha del producto.</div>
+        @endif
+    </div>
 
     @if ($categorias->isEmpty())
         <div class="alert alert-warning">
@@ -30,11 +37,14 @@
         @endif
 
         <form method="POST" action="{{ $producto->exists ? route('productos.update', $producto) : route('productos.store') }}"
-              class="card card-body" style="max-width: 48rem">
+              style="max-width: 48rem">
             @csrf
             @if ($producto->exists)
                 @method('PUT')
             @endif
+
+            <section class="card card-body mb-3" aria-labelledby="datos-titulo">
+            <h2 class="h6 mb-3" id="datos-titulo">Datos del producto</h2>
 
             <div class="mb-3">
                 <label for="nombre" class="form-label">Nombre descriptivo</label>
@@ -72,7 +82,7 @@
             </div>
 
             @unless ($producto->exists)
-                <div class="mb-3">
+                <div>
                     <label for="nombre_presentacion_base" class="form-label">Unidad base</label>
                     <input type="text" id="nombre_presentacion_base" name="nombre_presentacion_base" maxlength="50"
                            value="{{ old('nombre_presentacion_base') }}" placeholder="Botella, unidad, paquete…"
@@ -83,6 +93,10 @@
                     @enderror
                 </div>
             @endunless
+            </section>
+
+            <section class="card card-body mb-3" aria-labelledby="control-titulo">
+            <h2 class="h6 mb-3" id="control-titulo">Existencias y control</h2>
 
             <div class="row g-3 mb-3">
                 <div class="col-md-6">
@@ -113,7 +127,7 @@
                 </div>
             </div>
 
-            <div class="mb-3">
+            <div>
                 <label for="observaciones" class="form-label">Observaciones <span class="text-body-secondary">(opcional)</span></label>
                 <textarea id="observaciones" name="observaciones" rows="2" maxlength="2000"
                           class="form-control @error('observaciones') is-invalid @enderror">{{ old('observaciones', $producto->observaciones) }}</textarea>
@@ -122,6 +136,8 @@
                 @enderror
             </div>
 
+            </section>
+
             @if (session('duplicados'))
                 <div class="form-check mb-3">
                     <input type="checkbox" id="confirmar_duplicado" name="confirmar_duplicado" value="1" class="form-check-input">
@@ -129,7 +145,7 @@
                 </div>
             @endif
 
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 barra-acciones">
                 <button type="submit" class="btn btn-primary">Guardar</button>
                 <a href="{{ $producto->exists ? route('productos.show', $producto) : route('productos.index') }}"
                    class="btn btn-outline-secondary">Cancelar</a>

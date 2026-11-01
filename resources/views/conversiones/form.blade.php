@@ -3,16 +3,15 @@
 @section('titulo', 'Abrir o convertir')
 
 @section('contenido')
-    <h1 class="h3 mb-1">Abrir o convertir</h1>
-    <p class="text-body-secondary">
+    <x-cabecera-producto :producto="$producto" titulo="Abrir o convertir">
         {{ $producto->nombre }} · lote <strong>{{ $lote->etiqueta() }}</strong>
         · {{ $lote->fecha_caducidad ? 'vence '.$lote->fecha_caducidad->format('d/m/Y') : 'sin caducidad' }}
-    </p>
+    </x-cabecera-producto>
 
     <p>
         En este lote:
         @forelse ($presentaciones->filter(fn ($p) => ($enLote[$p->id] ?? 0) !== 0) as $presentacion)
-            <span class="badge text-bg-light border fs-6 fw-normal me-1">{{ $enLote[$presentacion->id] }} {{ $presentacion->nombre }}</span>
+            <span class="badge bg-body-secondary text-body border fs-6 fw-normal me-1">{{ $enLote[$presentacion->id] }} {{ $presentacion->nombre }}</span>
         @empty
             <span class="text-body-secondary">sin existencias</span>
         @endforelse
@@ -30,12 +29,11 @@
         @endif
 
         <div class="row g-3 mb-3">
-            <div class="col-5">
+            <div class="col-12 col-sm-6">
                 <label for="cantidad" class="form-label">Cantidad</label>
-                <input type="number" id="cantidad" name="cantidad" min="1" step="1" inputmode="numeric"
-                       value="{{ old('cantidad', 1) }}" class="form-control form-control-lg @error('cantidad') is-invalid @enderror" required>
+                @include('compartido.cantidad', ['id' => 'cantidad', 'name' => 'cantidad', 'min' => 1, 'valor' => old('cantidad', 1), 'grande' => true, 'requerido' => true])
             </div>
-            <div class="col-7">
+            <div class="col-12 col-sm-6">
                 <label for="presentacion_origen_id" class="form-label">De</label>
                 <select id="presentacion_origen_id" name="presentacion_origen_id" class="form-select form-select-lg @error('presentacion_origen_id') is-invalid @enderror">
                     @foreach ($presentaciones as $presentacion)
@@ -71,7 +69,7 @@
             <textarea id="observacion" name="observacion" rows="2" maxlength="2000" class="form-control">{{ old('observacion') }}</textarea>
         </div>
 
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 barra-acciones">
             <button type="submit" class="btn btn-primary btn-lg" id="guardar">Registrar conversión</button>
             <a href="{{ $volverASalida ? route('salidas.create', ['producto' => $producto->id]) : route('inventario.show', $producto) }}"
                class="btn btn-outline-secondary btn-lg">Cancelar</a>
