@@ -836,6 +836,65 @@ summary.btn::-webkit-details-marker {
     padding-left: 2.75rem;
 }
 
+/* Selector de productos (Recibir y Retirar): el campo queda a la vista mientras se recorre la lista. */
+.selector-producto {
+    max-width: 48rem;
+}
+
+.selector-producto__busqueda {
+    position: sticky;
+    top: 3rem;
+    z-index: 5;
+    margin: 0;
+    padding: 0.25rem 0 0.5rem;
+    background: var(--bs-tertiary-bg);
+}
+
+@media (min-width: 1200px) {
+    .selector-producto__busqueda {
+        top: 0;
+    }
+}
+
+.selector-producto [hidden] {
+    display: none !important;
+}
+
+/* Hay filas ocultas entre las visibles: los bordes y esquinas no pueden depender de :first-child. */
+.selector-producto .list-group {
+    overflow: hidden;
+    border: var(--bs-border-width) solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius-lg);
+}
+
+.selector-producto .list-group-item {
+    margin-top: calc(-1 * var(--bs-border-width));
+    border-width: var(--bs-border-width) 0 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.selector-producto .resultado-producto {
+    min-height: 44px;
+}
+
+.selector-producto .resultado-producto:hover {
+    background: var(--bs-tertiary-bg);
+}
+
+.selector-producto .resultado-producto:focus-visible {
+    outline-offset: -3px;
+}
+
+.nombre-producto {
+    overflow-wrap: anywhere;
+}
+
+/* Sin existencias: el color pasa a los tokens secundarios (contraste AA); la etiqueta lo dice con texto. */
+.producto-agotado .nombre-producto {
+    color: var(--bs-secondary-color);
+}
+
 /* Inicio de sesión. */
 .login-pagina {
     display: flex;

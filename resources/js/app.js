@@ -143,3 +143,136 @@ document.addEventListener('keydown', (evento) => {
 
     siguiente?.focus();
 });
+
+// Selector de productos de Recibir y Retirar: la lista completa ya viene impresa por el servidor y aquí
+// solo se filtra al escribir (todas las palabras, en cualquier parte del nombre, la marca o la categoría;
+// sin tildes ni mayúsculas, como la colación del servidor). Sin este script queda el formulario GET.
+const normalizar = (texto) => texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
+document.querySelectorAll('[data-selector-producto]').forEach((selector) => {
+    const campo = selector.querySelector('#q');
+    const lista = selector.querySelector('[data-lista]');
+    const contador = selector.querySelector('[data-contador]');
+    const anuncio = selector.querySelector('[data-anuncio]');
+    const vacio = selector.querySelector('[data-vacio]');
+    const vacioTexto = selector.querySelector('[data-vacio-texto]');
+    const interruptor = selector.querySelector('[data-solo-existencias]');
+    const solo = interruptor?.querySelector('input');
+    const items = [...lista.querySelectorAll('[data-producto]')];
+    let temporizador;
+
+    interruptor?.removeAttribute('hidden');
+
+    // Con el filtro en vivo el botón sobra (Enter y la tecla de búsqueda del teclado táctil siguen enviando el formulario).
+    selector.querySelector('[data-buscar]')?.setAttribute('hidden', '');
+    campo.closest('.col-md-9')?.classList.replace('col-md-9', 'col-md-12');
+
+    const visibles = () => items.filter((item) => !item.hidden);
+    const enlaces = () => visibles().map((item) => item.querySelector('a'));
+    // Un código de barras (solo cifras y guiones) se envía al servidor, que lo resuelve como siempre.
+    const parecePorCodigo = (texto) => /^[0-9-]{6,}$/.test(texto);
+
+    const filtrar = (anunciar = false) => {
+        const consulta = normalizar(campo.value);
+        const palabras = consulta.split(/\s+/).filter(Boolean);
+
+        items.forEach((item) => {
+            const coincide = palabras.every((palabra) => item.dataset.busqueda.includes(palabra))
+                && !(solo?.checked && item.hasAttribute('data-agotado'));
+
+            item.hidden = !coincide;
+        });
+
+        // Primero los que empiezan por lo escrito, luego los que lo tienen en una palabra, luego el resto.
+        const rango = (item) => {
+            if (consulta === '') {
+                return 0;
+            }
+
+            return item.dataset.nombre.startsWith(consulta) ? 0 : (` ${item.dataset.nombre}`.includes(` ${consulta}`) ? 1 : 2);
+        };
+        const orden = new Map(items.map((item, indice) => [item, indice]));
+
+        lista.append(...[...items].sort((a, b) => rango(a) - rango(b) || orden.get(a) - orden.get(b)));
+
+        const total = visibles().length;
+        const texto = `${total} ${total === 1 ? 'producto' : 'productos'}`;
+
+        contador.textContent = texto;
+        vacio.hidden = total > 0;
+        vacioTexto.textContent = total > 0 ? '' : (campo.value.trim() !== ''
+            ? `No hay productos activos que coincidan con «${campo.value.trim()}».`
+            : 'No hay productos con existencias.');
+
+        if (anunciar) {
+            clearTimeout(temporizador);
+            temporizador = setTimeout(() => {
+                anuncio.textContent = total > 0 ? texto : 'Sin coincidencias';
+            }, 400);
+        }
+    };
+
+    campo.addEventListener('input', () => filtrar(true));
+    solo?.addEventListener('change', () => filtrar(true));
+
+    campo.addEventListener('keydown', (evento) => {
+        const texto = campo.value.trim();
+
+        if (evento.key === 'ArrowDown') {
+            const primero = enlaces()[0];
+
+            if (primero) {
+                evento.preventDefault();
+                primero.focus();
+            }
+        } else if (evento.key === 'Escape' && campo.value !== '') {
+            campo.value = '';
+            filtrar(true);
+        } else if (evento.key === 'Enter') {
+            const coincidencias = enlaces();
+
+            if (texto === '' || (coincidencias.length > 0 && !parecePorCodigo(texto))) {
+                evento.preventDefault();
+
+                if (coincidencias.length === 1) {
+                    window.location.href = coincidencias[0].href;
+                } else if (coincidencias.length > 1) {
+                    coincidencias[0].focus();
+                }
+            }
+        }
+    });
+
+    lista.addEventListener('keydown', (evento) => {
+        const actuales = enlaces();
+        const indice = actuales.indexOf(document.activeElement);
+
+        if (indice === -1 || !['ArrowDown', 'ArrowUp', 'Escape'].includes(evento.key)) {
+            return;
+        }
+
+        evento.preventDefault();
+
+        if (evento.key === 'ArrowDown') {
+            actuales[Math.min(indice + 1, actuales.length - 1)].focus();
+        } else if (evento.key === 'ArrowUp' && indice > 0) {
+            actuales[indice - 1].focus();
+        } else {
+            campo.focus();
+        }
+    });
+
+    selector.querySelector('[data-limpiar]')?.addEventListener('click', (evento) => {
+        evento.preventDefault();
+        campo.value = '';
+
+        if (solo) {
+            solo.checked = false;
+        }
+
+        filtrar(true);
+        campo.focus();
+    });
+
+    filtrar();
+});

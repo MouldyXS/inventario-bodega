@@ -45,6 +45,7 @@ Laravel 13 y PHP 8.5, MySQL 8.4, plantillas Blade con Bootstrap, Apache 2.4, Tai
 ## Documentación
 
 - [`docs/Requerimientos.txt`](docs/Requerimientos.txt): especificación completa y decisiones de diseño.
+- [`docs/GUIA_DE_USO.md`](docs/GUIA_DE_USO.md): guía para el encargado y el administrador, paso a paso.
 - [`docs/OPERACION.md`](docs/OPERACION.md): operación diaria y procedimientos.
 - [`docs/RESTAURACION.md`](docs/RESTAURACION.md): copias de seguridad y restauración.
 - [`CLAUDE.md`](CLAUDE.md): guía del proyecto para trabajar con asistentes de código.

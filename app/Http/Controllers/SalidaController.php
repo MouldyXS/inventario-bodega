@@ -30,7 +30,7 @@ class SalidaController extends Controller
             : null;
 
         if ($producto === null) {
-            return $this->buscarProducto($request, 'salidas.create', 'Nueva salida');
+            return $this->buscarProducto($request, 'salidas.create', 'Nueva salida', conExistencias: true);
         }
 
         $lotes = $existencias->lotes($producto);

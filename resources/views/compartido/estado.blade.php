@@ -1,7 +1,7 @@
 {{--
     Píldora de estado: icono + texto, nunca solo color.
     Uso: @include('compartido.estado', ['tipo' => 'vencido'])  (opcional: 'texto' => '…' para otra etiqueta)
-    Tipos: vencido, proximo, vigente, bajo, activo, inactivo, recomendado, base, inactiva.
+    Tipos: vencido, proximo, vigente, bajo, activo, inactivo, recomendado, base, inactiva, agotado.
 --}}
 @php
     [$clase, $icono, $etiqueta] = match ($tipo) {
@@ -14,6 +14,7 @@
         'inactiva' => ['neutro', 'pausa', 'Inactiva'],
         'recomendado' => ['marca', 'estrella', 'Recomendado'],
         'base' => ['marca', 'info', 'Unidad base'],
+        'agotado' => ['neutro', 'pausa', 'Sin existencias'],
     };
 @endphp
 <span class="estado estado--{{ $clase }}"><svg class="icono" aria-hidden="true"><use href="#i-{{ $icono }}"/></svg><span>{{ $texto ?? $etiqueta }}</span></span>

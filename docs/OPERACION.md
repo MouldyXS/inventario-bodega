@@ -1,6 +1,6 @@
 # Operación del sistema
 
-Guía corta para el administrador. Detalle de diseño en `Requerimientos.txt`; copias en `RESTAURACION.md`.
+Guía corta para el administrador. Detalle de diseño en `Requerimientos.txt`; copias en `RESTAURACION.md`. El uso diario de las pantallas (recibir, retirar, ajustes, usuarios) está en `GUIA_DE_USO.md`.
 
 ## Cómo está montado
 

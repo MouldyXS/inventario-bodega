@@ -1004,6 +1004,8 @@ El registro y la edición requieren el rol de administrador o `puede_gestionar_c
 
 ## 9.4. Recepciones
 
+Primer paso, común con las salidas (§9.5): elegir el producto en una lista de los productos activos con su nombre completo, marca, categoría y miniatura si la tiene. La lista se filtra al escribir (todas las palabras, en cualquier parte del nombre, la marca o la categoría, sin distinguir tildes ni mayúsculas), avisa cuando no hay coincidencias y recupera el listado completo al borrar el texto. El lector de códigos sigue escribiendo en el mismo campo: un código exacto lleva directo al formulario. Hasta 500 productos activos se lista todo; por encima, solo se lista al buscar. En Retirar cada producto muestra además su existencia y los agotados se marcan «Sin existencias» (un interruptor los oculta); no cambia qué productos pueden retirarse.
+
 Formulario para registrar:
 - Producto.
 - Fecha de recepción.
@@ -1451,6 +1453,8 @@ Resultado esperado:
 | Gestión de usuarios | Confirmado (Etapa 8) | Pantalla Usuarios (solo administrador), Mi cuenta y `inventario:cerrar-sesiones`; siempre queda un administrador activo. |
 | Rediseño de la interfaz | Confirmado (rediseño, 30-10-2026) | Barra lateral en PC y barra inferior con hoja «Más» en tablet y móvil; tema claro, oscuro y automático (sigue al sistema, también si cambia con la página abierta); tablas que se apilan como tarjetas bajo 1024 px conservando la semántica de tabla; cantidades con − / +; motivo segmentado; contraseñas con «Mostrar»; salto al contenido y foco visible. Sin cambios de rutas, campos, validaciones ni permisos. Auditoría automática en navegador: contraste AA de texto sin fallos y sin desbordes en 25 pantallas, 2 temas y 3 anchos. Pendiente solo la prueba con lector de pantalla real (TalkBack en la tablet, NVDA en el PC). |
 | Imagen principal de producto | Confirmado (código); despliegue pendiente | Opcional; la carga, sustitución y retirada son solo del administrador y todos la ven. Se guardan miniatura (160 px) y versión media (1000 px) en WebP con GD, sin el original, en `storage/app/private/productos`, con la versión en la URL y caché privada. Límites de memoria calculados antes de decodificar, orientación EXIF y transparencia conservadas, y borrado de la versión anterior tras el commit. Va en las copias y en la prueba de restauración. Para activarla en producción hay que migrar (`productos.imagen`), habilitar `gd` y `exif` y subir `upload_max_filesize` a 10M y `post_max_size` a 12M en `C:\php\php.ini` (ver `docs/OPERACION.md`). |
+| Guía de uso | Confirmado (texto y 10 capturas) | `docs/GUIA_DE_USO.md`: guía en español para el encargado y el administrador, con los rótulos reales de las pantallas, la tabla de permisos de §2.3, glosario y problemas frecuentes. Capturas con datos ficticios en `docs/img/guia/`. Falta leerla una vez desde la tablet. |
+| Selector de productos en Recibir y Retirar | Confirmado (código); falta probar con TalkBack y lector real | Paso 1 con lista completa filtrable al escribir (ver §9.4), con búsqueda por cualquier palabra sin tildes ni mayúsculas, aviso de «sin coincidencias», teclado (↓ ↑ Esc Enter), región viva para lectores de pantalla y funcionamiento sin JavaScript. Retirar muestra existencias y marca «Sin existencias». No cambia ninguna regla de recepción ni de salida. |
 | Ubicación dentro de la bodega | No confirmada | No implementar todavía. |
 | Notificaciones externas | Posterior | Solo alertas en pantalla. |
 
